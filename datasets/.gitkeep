@@ -1,0 +1,2 @@
+# This file ensures the datasets directory exists in Git
+# User-uploaded datasets will be gitignored, but the directory structure is preserved

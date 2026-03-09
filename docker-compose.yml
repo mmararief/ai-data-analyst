@@ -1,0 +1,120 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: ai_analyst_api
+    restart: unless-stopped
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      SECRET_KEY: ${SECRET_KEY:-changeme-super-secret-key}
+      MYSQL_URL: mysql+pymysql://${MYSQL_USER:-analyst}:${MYSQL_PASSWORD:-analyst_password}@mysql:3306/${MYSQL_DATABASE:-ai_analyst}
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-ai-datasets}
+      MINIO_SECURE: "false"
+      MODEL_CHAT: ${MODEL_CHAT:-gemini-3.1-flash-lite-preview}
+      MODEL_DEEP: ${MODEL_DEEP:-gemini-3.1-pro-preview}
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    command: python -m backend.worker_main
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      SECRET_KEY: ${SECRET_KEY:-changeme-super-secret-key}
+      MYSQL_URL: mysql+pymysql://${MYSQL_USER:-analyst}:${MYSQL_PASSWORD:-analyst_password}@mysql:3306/${MYSQL_DATABASE:-ai_analyst}
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-ai-datasets}
+      MINIO_SECURE: "false"
+      MODEL_CHAT: ${MODEL_CHAT:-gemini-3.1-flash-lite-preview}
+      MODEL_DEEP: ${MODEL_DEEP:-gemini-3.1-pro-preview}
+      SANDBOX_TIMEOUT: ${SANDBOX_TIMEOUT:-120}
+      SANDBOX_MEM_LIMIT: ${SANDBOX_MEM_LIMIT:-512m}
+      SANDBOX_CPU_QUOTA: ${SANDBOX_CPU_QUOTA:-100000}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.0
+    container_name: ai_analyst_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_analyst}
+      MYSQL_USER: ${MYSQL_USER:-analyst}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-analyst_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai_analyst_redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: ai_analyst_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_data:
+  redis_data:
+  minio_data:
