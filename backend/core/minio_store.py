@@ -4,10 +4,13 @@ MinIO client untuk penyimpanan dataset pengguna.
 Bucket  : ai-datasets  (konfigurasi via MINIO_BUCKET)
 Layout  : datasets/{user_id}/{relative_path}
 
-File internal yang tidak disimpan ke MinIO:
-  - _exec_script.py   (skrip sandbox sementara)
-  - _chart_*.png      (grafik dibaca inline lalu dihapus oleh agent_runner)
-  - .chats.json
+File internal runtime yang tidak disimpan ke MinIO:
+    - _exec_script.py   (skrip sandbox sementara)
+    - _chart_*.png      (grafik dibaca inline lalu dihapus oleh agent_runner)
+    - .chats.json
+
+File internal yang disimpan tapi disembunyikan dari listing UI:
+    - _schema.json
 """
 
 import io
@@ -31,7 +34,8 @@ except ImportError:
     MINIO_BUCKET = "ai-datasets"
     MINIO_SECURE = False
 
-_SKIP_NAMES = {"_exec_script.py", ".chats.json"}
+_RUNTIME_SKIP_NAMES = {"_exec_script.py", ".chats.json"}
+_LIST_SKIP_NAMES = {"_exec_script.py", ".chats.json", "_schema.json"}
 _SKIP_PREFIXES = ("_chart_",)
 
 
@@ -58,8 +62,12 @@ def _user_prefix(user_id: str) -> str:
     return f"datasets/{user_id}/"
 
 
-def _is_private(name: str) -> bool:
-    return name in _SKIP_NAMES or any(name.startswith(p) for p in _SKIP_PREFIXES)
+def _is_runtime_private(name: str) -> bool:
+    return name in _RUNTIME_SKIP_NAMES or any(name.startswith(p) for p in _SKIP_PREFIXES)
+
+
+def _is_list_hidden(name: str) -> bool:
+    return name in _LIST_SKIP_NAMES or any(name.startswith(p) for p in _SKIP_PREFIXES)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -90,7 +98,7 @@ def list_user_objects(user_id: str) -> list[dict]:
                     "image_count": img_count,
                 })
             else:
-                if _is_private(name):
+                if _is_list_hidden(name):
                     continue
                 items.append({
                     "name": name,
@@ -172,7 +180,7 @@ def download_user_files(user_id: str, target_dir: Path) -> None:
             rel = obj.object_name[len(prefix):]
             if not rel or obj.is_dir:
                 continue
-            if _is_private(Path(rel).name):
+            if _is_runtime_private(Path(rel).name):
                 continue
             dest = target_dir / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -200,11 +208,11 @@ def upload_generated_files(user_id: str, source_dir: Path) -> None:
     for f in source_dir.rglob("*"):
         if not f.is_file():
             continue
-        if _is_private(f.name):
+        if _is_runtime_private(f.name):
             continue
         rel = f.relative_to(source_dir).as_posix()
         obj_name = f"{prefix}{rel}"
-        if obj_name not in existing:
+        if obj_name not in existing or f.suffix == '.pkl':
             client.fput_object(MINIO_BUCKET, obj_name, str(f))
 
 

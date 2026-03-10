@@ -171,6 +171,105 @@ function TypingIndicator() {
   )
 }
 
+function PartRenderer({ part, index, openInsights, toggleInsight }) {
+  if (part.type === 'text') {
+    return (
+      <div key={index} className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed">
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+          {part.content}
+        </ReactMarkdown>
+      </div>
+    )
+  } else if (part.type === 'plan') {
+    return (
+      <div key={index} className="my-3 border-l-2 border-[var(--border-primary)] pl-4 py-1">
+        <div className="flex items-center gap-2 mb-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Rencana Eksekusi {part.content?.length ? `(${part.content.length} langkah)` : ''}
+        </div>
+        <div className="space-y-2">
+          {(part.content || []).map((item, ti) => {
+            const taskText = typeof item === 'string' ? item : (item?.task || String(item))
+            const agentType = typeof item === 'object' ? item?.agent : null
+            return (
+              <div key={ti} className="flex items-start gap-2 text-[12.5px] text-[var(--text-secondary)] leading-relaxed">
+                <span className="text-[var(--text-muted)] font-mono shrink-0 select-none mt-0.5">{ti + 1}.</span>
+                <span>{taskText}
+                  {agentType && (
+                    <span className="ml-2 inline-block px-1.5 py-0.5 rounded-sm border border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[9px] uppercase tracking-wider text-[var(--text-muted)] select-none">
+                      {agentType}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  } else if (part.type === 'agent_label') {
+    return (
+      <div key={index} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[10px] font-medium text-[var(--text-muted)] my-2 shadow-sm">
+        <svg className="w-3 h-3 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+        Agent: <span className="text-[var(--text-secondary)] font-semibold">{part.content}</span>
+      </div>
+    )
+  } else if (part.type === 'task_start') {
+    return (
+      <div key={index} className="flex items-center gap-2 mt-4 mb-2">
+        <span className="text-[10px] bg-[var(--bg-tertiary)] border border-[var(--border-light)] px-1.5 py-0.5 rounded text-[var(--text-muted)] shrink-0 font-mono select-none">
+          {(part.index ?? 0) + 1}/{part.total}
+        </span>
+        <span className="text-[12px] text-[var(--text-primary)] font-medium truncate">{part.content}</span>
+        {part.agent && (
+          <span className="ml-1 inline-block px-1.5 py-0.5 rounded-sm border border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[9px] uppercase tracking-wider text-[var(--text-muted)] select-none">
+            {part.agent}
+          </span>
+        )}
+        <div className="flex-1 h-px bg-[var(--border-light)] ml-1" />
+      </div>
+    )
+  } else if (part.type === 'insight') {
+    return (
+      <div key={index} className="mt-6 pt-4 border-t-2 border-dotted border-[var(--border-light)]">
+        <button
+          onClick={() => toggleInsight(index)}
+          className="flex items-center gap-2 mb-3 text-[13px] font-bold text-[var(--text-heading)] hover:opacity-80 transition-opacity cursor-pointer w-full"
+        >
+          <svg className="w-4 h-4 text-sky-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Insight &amp; Summary
+          <svg className={`w-4 h-4 shrink-0 transition-transform ${openInsights[index] ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+        </button>
+        {openInsights[index] && (
+          <div className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed bg-[var(--bg-tertiary)]/30 p-4 rounded-lg border border-[var(--border-light)] animate-fade-in">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+              {part.content}
+            </ReactMarkdown>
+          </div>
+        )}
+      </div>
+    )
+  } else if (part.type === 'streamlit') {
+    return <StreamlitPanel key={index} filename={part.content} />
+  } else if (part.content) {
+    // Image
+    return (
+      <div key={index} className="space-y-1">
+        <div className="rounded-lg overflow-hidden border border-slate-800">
+          <img src={`data:image/png;base64,${part.content}`} alt="grafik" className="w-full" />
+        </div>
+        <a href={`data:image/png;base64,${part.content}`} download={`grafik_${index}.png`}
+          className="inline-flex items-center gap-1 text-[11px] text-sky-500 hover:text-sky-400 transition-colors"
+        >
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+          Download
+        </a>
+      </div>
+    )
+  }
+  return null
+}
+
 function StreamlitPanel({ filename }) {
   const [info, setInfo] = useState(null)
   const [launching, setLaunching] = useState(false)
@@ -224,6 +323,14 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
   const isEmpty = !message.parts?.length && !message.codeSteps?.length
   const [nbLoading, setNbLoading] = useState(false)
   const [nbError, setNbError] = useState('')
+  const [openInsights, setOpenInsights] = useState({})  // Track which insights are open
+
+  const toggleInsight = (index) => {
+    setOpenInsights(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }))
+  }
 
   const handleDownloadNotebook = async () => {
     setNbLoading(true); setNbError('')
@@ -233,15 +340,58 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
   }
 
   // Build a merged, ordered list of text/image/streamlit parts + code steps
-  // to interleave them as they arrived, matching VS Code agent style
+  // Properly interleave code steps with the analysis text/plans they belong to
   const buildOrderedParts = () => {
     const parts = message.parts || (message.content ? [{ type: 'text', content: message.content }] : [])
     const steps = message.codeSteps || []
-    // Interleave: each code step is inserted after the text part that preceded it.
-    // Simple pass: text/image/streamlit come first as-is, codeSteps appended after
-    return { parts, steps }
+    
+    // Smart interleaving: group parts by task/agent, then interleave with corresponding steps
+    // Count non-insight parts to distribute code steps
+    const nonInsightParts = parts.filter(p => p.type !== 'insight')
+    const insightPart = parts.find(p => p.type === 'insight')
+    
+    if (steps.length === 0) {
+      // No steps, just return parts as ordered array
+      const ordered = nonInsightParts.map(p => ({ type: 'part', value: p }))
+      if (insightPart) {
+        ordered.push({ type: 'part', value: insightPart })
+      }
+      return { ordered, parts, steps: [] }
+    }
+    
+    // Distribute code steps among the non-insight parts
+    // Simple heuristic: divide steps equally among agents/tasks
+    const stepsPerBlock = Math.ceil(steps.length / Math.max(nonInsightParts.length, 1))
+    
+    const ordered = []
+    let stepIndex = 0
+    
+    // Interleave parts and steps
+    nonInsightParts.forEach(part => {
+      ordered.push({ type: 'part', value: part })
+      
+      // Add corresponding code steps for this part
+      const stepsToAdd = steps.slice(stepIndex, stepIndex + stepsPerBlock)
+      stepsToAdd.forEach(step => {
+        ordered.push({ type: 'step', value: step })
+      })
+      stepIndex += stepsToAdd.length
+    })
+    
+    // Add remaining steps
+    while (stepIndex < steps.length) {
+      ordered.push({ type: 'step', value: steps[stepIndex] })
+      stepIndex++
+    }
+    
+    // Add insight at the end
+    if (insightPart) {
+      ordered.push({ type: 'part', value: insightPart })
+    }
+    
+    return { ordered, parts, steps }
   }
-  const { parts, steps } = buildOrderedParts()
+  const { ordered, parts: allParts, steps } = buildOrderedParts()
   const lastStepRunning = isLoading && steps.length > 0 && !steps[steps.length - 1]?.output
 
   return (
@@ -270,99 +420,19 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
                 <TypingIndicator />
               ) : (
                 <>
-                  {/* Text / image / streamlit / plan / task_start parts */}
-                  {parts.map((part, i) =>
-                    part.type === 'text' ? (
-                      <div key={i} className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                          {part.content}
-                        </ReactMarkdown>
-                      </div>
-                    ) : part.type === 'plan' ? (
-                      /* Pro Mode plan overview card — Minimalist Professional Design */
-                      <div key={i} className="my-3 border-l-2 border-[var(--border-primary)] pl-4 py-1">
-                        <div className="flex items-center gap-2 mb-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--text-muted)]">
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                          Rencana Eksekusi {part.content?.length ? `(${part.content.length} langkah)` : ''}
-                        </div>
-                        <div className="space-y-2">
-                          {(part.content || []).map((item, ti) => {
-                            const taskText = typeof item === 'string' ? item : (item?.task || String(item))
-                            const agentType = typeof item === 'object' ? item?.agent : null
-                            return (
-                              <div key={ti} className="flex items-start gap-2 text-[12.5px] text-[var(--text-secondary)] leading-relaxed">
-                                <span className="text-[var(--text-muted)] font-mono shrink-0 select-none mt-0.5">{ti + 1}.</span>
-                                <span>{taskText}
-                                  {agentType && (
-                                    <span className="ml-2 inline-block px-1.5 py-0.5 rounded-sm border border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[9px] uppercase tracking-wider text-[var(--text-muted)] select-none">
-                                      {agentType}
-                                    </span>
-                                  )}
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ) : part.type === 'agent_label' ? (
-                      /* Agent pipeline: active agent badge - Minimalist */
-                      <div key={i} className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[10px] font-medium text-[var(--text-muted)] my-2 shadow-sm">
-                        <svg className="w-3 h-3 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
-                        Agent: <span className="text-[var(--text-secondary)] font-semibold">{part.content}</span>
-                      </div>
-                    ) : part.type === 'task_start' ? (
-                      /* Pro Mode task section header - Minimalist */
-                      <div key={i} className="flex items-center gap-2 mt-4 mb-2">
-                        <span className="text-[10px] bg-[var(--bg-tertiary)] border border-[var(--border-light)] px-1.5 py-0.5 rounded text-[var(--text-muted)] shrink-0 font-mono select-none">
-                          {(part.index ?? 0) + 1}/{part.total}
-                        </span>
-                        <span className="text-[12px] text-[var(--text-primary)] font-medium truncate">{part.content}</span>
-                        {part.agent && (
-                          <span className="ml-1 inline-block px-1.5 py-0.5 rounded-sm border border-[var(--border-light)] bg-[var(--bg-tertiary)] text-[9px] uppercase tracking-wider text-[var(--text-muted)] select-none">
-                            {part.agent}
-                          </span>
-                        )}
-                        <div className="flex-1 h-px bg-[var(--border-light)] ml-1" />
-                      </div>
-                    ) : part.type === 'insight' ? (
-                      /* Insight/Report Agent final output - Minimalist professional */
-                      <div key={i} className="mt-6 pt-4 border-t-2 border-dotted border-[var(--border-light)]">
-                         <div className="flex items-center gap-2 mb-3 text-[13px] font-bold text-[var(--text-heading)]">
-                          <svg className="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                          Insight &amp; Summary
-                        </div>
-                        <div className="text-[13.5px] text-[var(--text-secondary)] leading-relaxed bg-[var(--bg-tertiary)]/30 p-4 rounded-lg border border-[var(--border-light)]">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                            {part.content}
-                          </ReactMarkdown>
-                        </div>
-                      </div>
-                    ) : part.type === 'streamlit' ? (
-                      <StreamlitPanel key={i} filename={part.content} />
+                  {/* Interleaved text/image/streamlit parts + code steps */}
+                  {ordered.map((item, i) =>
+                    item.type === 'part' ? (
+                      <PartRenderer key={i} part={item.value} index={i} openInsights={openInsights} toggleInsight={toggleInsight} />
                     ) : (
-                      <div key={i} className="space-y-1">
-                        <div className="rounded-lg overflow-hidden border border-slate-800">
-                          <img src={`data:image/png;base64,${part.content}`} alt="grafik" className="w-full" />
-                        </div>
-                        <a href={`data:image/png;base64,${part.content}`} download={`grafik_${i}.png`}
-                          className="inline-flex items-center gap-1 text-[11px] text-sky-500 hover:text-sky-400 transition-colors"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
-                          Download
-                        </a>
-                      </div>
+                      <ToolCallStep
+                        key={i}
+                        step={item.value}
+                        index={i}
+                        isRunning={isLoading && i === ordered.length - 1 && !item.value.output}
+                      />
                     )
                   )}
-
-                  {/* Inline tool-call steps — VS Code Copilot agent style */}
-                  {steps.map((step, i) => (
-                    <ToolCallStep
-                      key={i}
-                      step={step}
-                      index={i}
-                      isRunning={isLoading && i === steps.length - 1 && !step.output}
-                    />
-                  ))}
 
                   {/* Live status when still processing */}
                   {isLoading && (

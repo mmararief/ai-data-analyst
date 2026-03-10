@@ -14,6 +14,7 @@ export default function ChatPage({ username, onLogout, initialSessionId }) {
   const [fileRefreshTrigger, setFileRefreshTrigger] = useState(0)
   const [sessionId, setSessionId] = useState(null)
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -58,55 +59,55 @@ export default function ChatPage({ username, onLogout, initialSessionId }) {
     const token = localStorage.getItem('token')
     if (!token) return
 
-    ;(async () => {
-      try {
-        // Ask the server if this session has an active running job
-        const res = await fetch(`/chat/session/${initialSessionId}/active-job`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (!res.ok) return
-        const data = await res.json()
+      ; (async () => {
+        try {
+          // Ask the server if this session has an active running job
+          const res = await fetch(`/chat/session/${initialSessionId}/active-job`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          if (!res.ok) return
+          const data = await res.json()
 
-        if (!data.active) {
-          // No running job — but if the job just finished, reload saved history
-          if (data.done) {
-            try {
-              const histRes = await api.get(`/history/${initialSessionId}`)
-              setMessages(histRes.data.messages.map(m => ({
-                ...m,
-                parts: m.parts?.length ? m.parts : (m.role === 'assistant' && m.content ? [{ type: 'text', content: m.content }] : []),
-                images: m.images || [],
-                codeSteps: m.codeSteps || [],
-              })))
-            } catch {}
+          if (!data.active) {
+            // No running job — but if the job just finished, reload saved history
+            if (data.done) {
+              try {
+                const histRes = await api.get(`/history/${initialSessionId}`)
+                setMessages(histRes.data.messages.map(m => ({
+                  ...m,
+                  parts: m.parts?.length ? m.parts : (m.role === 'assistant' && m.content ? [{ type: 'text', content: m.content }] : []),
+                  images: m.images || [],
+                  codeSteps: m.codeSteps || [],
+                })))
+              } catch { }
+            }
+            return
           }
-          return
+
+          // Active job found — show user message + loading immediately
+          const { job_id, question } = data
+          setSessionId(initialSessionId)
+          setLoading(true)
+          setStatusText('Menyambungkan ulang...')
+          setMessages(prev => [
+            ...prev,
+            { role: 'user', content: question },
+            { role: 'assistant', content: '', parts: [], images: [], codeSteps: [] },
+          ])
+
+          // Replay all buffered events from index 0
+          const accParts = []
+          const accCodeSteps = []
+          const accImages = []
+          const response = await fetch(`/chat/events/${job_id}?from_idx=0`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          await processEventStream(response, '', accParts, accCodeSteps, accImages)
+        } catch { } finally {
+          setLoading(false)
+          setStatusText('')
         }
-
-        // Active job found — show user message + loading immediately
-        const { job_id, question } = data
-        setSessionId(initialSessionId)
-        setLoading(true)
-        setStatusText('Menyambungkan ulang...')
-        setMessages(prev => [
-          ...prev,
-          { role: 'user', content: question },
-          { role: 'assistant', content: '', parts: [], images: [], codeSteps: [] },
-        ])
-
-        // Replay all buffered events from index 0
-        const accParts = []
-        const accCodeSteps = []
-        const accImages = []
-        const response = await fetch(`/chat/events/${job_id}?from_idx=0`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        await processEventStream(response, '', accParts, accCodeSteps, accImages)
-      } catch {} finally {
-        setLoading(false)
-        setStatusText('')
-      }
-    })()
+      })()
   }, [historyLoaded])
 
   const sendMessage = async (question) => {
@@ -310,7 +311,7 @@ export default function ChatPage({ username, onLogout, initialSessionId }) {
             title: firstUser.content.slice(0, 80),
             messages: toSave,
           })
-        } catch {}
+        } catch { }
       }
 
       setFileRefreshTrigger(t => t + 1)
@@ -489,34 +490,41 @@ ${bodyHtml}
         onSendMessage={(q) => sendMessage(q)}
         onLoadHistory={handleLoadHistory}
         refreshTrigger={fileRefreshTrigger}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-3 border-b border-[var(--border-light)] bg-[var(--bg-header)] backdrop-blur-sm animate-slide-in-bottom">
-          <div className="flex items-center">
-            <h1 className="font-bold text-lg tracking-tight text-[var(--text-heading)]">Analis<span className="text-sky-400">ai</span></h1>
+        <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-[var(--border-light)] bg-[var(--bg-header)] backdrop-blur-sm animate-slide-in-bottom">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] md:hidden border border-[var(--border-primary)] rounded-lg"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             {/* New Chat */}
             <button
               onClick={handleNewChat}
               disabled={loading}
-              className="text-xs text-[var(--text-muted)] hover:text-sky-300 border border-[var(--border-primary)] rounded-lg px-3 py-1.5 hover:border-sky-500/30 transition-all duration-200 flex items-center gap-1.5 disabled:opacity-40"
+              className="text-xs text-[var(--text-muted)] hover:text-sky-300 border border-[var(--border-primary)] rounded-lg px-2.5 md:px-3 py-1.5 hover:border-sky-500/30 transition-all duration-200 flex items-center gap-1.5 disabled:opacity-40"
               title="Chat Baru"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
-              Baru
+              <svg className="w-4 h-4 md:w-3.5 md:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              <span className="hidden sm:inline">Baru</span>
             </button>
             {/* Export PDF */}
             {messages.length > 0 && !loading && (
               <button
                 onClick={handleExportPDF}
-                className="text-xs text-[var(--text-muted)] hover:text-green-300 border border-[var(--border-primary)] rounded-lg px-3 py-1.5 hover:border-green-500/30 transition-all duration-200 flex items-center gap-1.5"
+                className="text-xs text-[var(--text-muted)] hover:text-green-300 border border-[var(--border-primary)] rounded-lg px-2.5 md:px-3 py-1.5 hover:border-green-500/30 transition-all duration-200 flex items-center gap-1.5"
                 title="Export PDF"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Export
+                <svg className="w-4 h-4 md:w-3.5 md:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                <span className="hidden sm:inline">Export</span>
               </button>
             )}
             {/* Pro Mode toggle */}
@@ -524,14 +532,13 @@ ${bodyHtml}
               onClick={() => setProMode(v => !v)}
               disabled={loading}
               title={proMode ? 'Pro Mode aktif — klik untuk nonaktifkan' : 'Aktifkan Pro Mode (Planner + Executor)'}
-              className={`text-xs border rounded-lg px-3 py-1.5 transition-all duration-200 flex items-center gap-1.5 disabled:opacity-40 ${
-                proMode
+              className={`text-xs border rounded-lg px-2.5 md:px-3 py-1.5 transition-all duration-200 flex items-center gap-1.5 disabled:opacity-40 ${proMode
                   ? 'bg-violet-600/20 border-violet-500/50 text-violet-300 hover:bg-violet-600/30'
                   : 'text-[var(--text-muted)] border-[var(--border-primary)] hover:text-violet-300 hover:border-violet-500/30'
-              }`}
+                }`}
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-              Pro{proMode ? ' ON' : ''}
+              <svg className="w-4 h-4 md:w-3.5 md:h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              <span className="hidden sm:inline">Pro{proMode ? ' ON' : ''}</span>
             </button>
             {/* Theme toggle */}
             <button
@@ -540,12 +547,12 @@ ${bodyHtml}
               title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
             >
               {theme === 'dark' ? (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
               ) : (
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
               )}
             </button>
-            <span className="text-[var(--text-muted)] text-sm">{username}</span>
+            <span className="text-[var(--text-muted)] text-sm hidden lg:inline">{username}</span>
             <button
               onClick={onLogout}
               className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[var(--border-primary)] rounded-lg px-3 py-1.5 hover:border-[var(--border-primary)] transition-all duration-200"
@@ -604,18 +611,17 @@ ${bodyHtml}
                     if (inputRef.current) inputRef.current.style.height = '52px';
                   }}
                   disabled={loading || !input.trim()}
-                  className={`flex items-center justify-center w-[34px] h-[34px] rounded-xl transition-all duration-200 ${
-                    loading
+                  className={`flex items-center justify-center w-[34px] h-[34px] rounded-xl transition-all duration-200 ${loading
                       ? 'text-sky-400 bg-transparent'
                       : input.trim()
                         ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20 hover:bg-sky-400 hover:-translate-y-0.5'
                         : 'bg-[var(--border-light)] text-[var(--text-muted)] cursor-not-allowed opacity-60'
-                  }`}
+                    }`}
                 >
                   {loading ? (
                     <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
                   ) : (
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

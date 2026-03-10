@@ -1,4 +1,6 @@
 import io
+import json
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -17,12 +19,79 @@ router = APIRouter(prefix="/datasets", tags=["datasets"])
 
 ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".json", ".parquet", ".pkl", ".joblib"}
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+SCHEMA_FILENAME = "_schema.json"
 
 
 def _validate_name(filename: str) -> None:
     """Tolak path traversal."""
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(400, "Nama file tidak valid")
+
+
+def _load_schema_index(user_id: str) -> dict:
+    if not object_exists(user_id, SCHEMA_FILENAME):
+        return {"datasets": [], "updated_at": None}
+    try:
+        raw = get_object_bytes(user_id, SCHEMA_FILENAME)
+        parsed = json.loads(raw.decode("utf-8"))
+        if isinstance(parsed, dict) and isinstance(parsed.get("datasets"), list):
+            return parsed
+    except Exception:
+        pass
+    return {"datasets": [], "updated_at": None}
+
+
+def _save_schema_index(user_id: str, payload: dict) -> None:
+    payload = {
+        "datasets": payload.get("datasets", []),
+        "updated_at": time.time(),
+    }
+    put_object_bytes(
+        user_id,
+        SCHEMA_FILENAME,
+        json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"),
+        content_type="application/json",
+    )
+
+
+def _infer_schema(filename: str, data: bytes) -> dict | None:
+    ext = Path(filename).suffix.lower()
+    try:
+        buf = io.BytesIO(data)
+        if ext == ".csv":
+            df = pd.read_csv(buf)
+        elif ext in (".xlsx", ".xls"):
+            df = pd.read_excel(buf)
+        elif ext == ".json":
+            df = pd.read_json(buf)
+        elif ext == ".parquet":
+            df = pd.read_parquet(buf)
+        elif ext == ".pkl":
+            df = pd.read_pickle(buf)
+        else:
+            return None
+        if not isinstance(df, pd.DataFrame):
+            return None
+        return {
+            "file": filename,
+            "rows": int(len(df)),
+            "columns": df.columns.tolist(),
+            "types": {col: str(dtype) for col, dtype in df.dtypes.items()},
+        }
+    except Exception:
+        return None
+
+
+def _upsert_schema_entry(user_id: str, schema: dict | None, filename: str) -> None:
+    index = _load_schema_index(user_id)
+    datasets = [item for item in index.get("datasets", []) if item.get("file") != filename]
+    if schema is not None:
+        datasets.append(schema)
+    index["datasets"] = sorted(datasets, key=lambda item: item.get("file", ""))
+    if index["datasets"]:
+        _save_schema_index(user_id, index)
+    elif object_exists(user_id, SCHEMA_FILENAME):
+        remove_object(user_id, SCHEMA_FILENAME)
 
 
 @router.get("/")
@@ -52,6 +121,7 @@ async def upload_file(
         raise HTTPException(413, f"Ukuran file melebihi batas {MAX_UPLOAD_MB} MB")
 
     put_object_bytes(user.user_id, file.filename, data)
+    _upsert_schema_entry(user.user_id, _infer_schema(file.filename, data), file.filename)
     return {
         "message": f"{file.filename} berhasil diupload",
         "filename": file.filename,
@@ -70,6 +140,8 @@ def delete_all_files(user: UserInDB = Depends(get_current_user)):
             remove_prefix(user.user_id, name)
         elif object_exists(user.user_id, name):
             remove_object(user.user_id, name)
+    if object_exists(user.user_id, SCHEMA_FILENAME):
+        remove_object(user.user_id, SCHEMA_FILENAME)
     return {"message": f"{len(files)} file berhasil dihapus"}
 
 
@@ -82,6 +154,7 @@ def delete_file(filename: str, user: UserInDB = Depends(get_current_user)):
         remove_object(user.user_id, filename)
     else:
         raise HTTPException(404, "File tidak ditemukan")
+    _upsert_schema_entry(user.user_id, None, filename)
     return {"message": f"{filename} berhasil dihapus"}
 
 

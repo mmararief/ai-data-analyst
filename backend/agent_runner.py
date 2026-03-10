@@ -1,4 +1,5 @@
 import warnings
+import json
 import re
 import base64 as _base64
 import queue
@@ -35,12 +36,13 @@ def _list_data_contents(data_folder: Path) -> str:
 def build_system_prompt(data_folder: Path) -> str:
     file_list = _list_data_contents(data_folder)
     return f"""
-Kamu adalah AI Data Analyst & ML Engineer ahli. Bantu pengguna menganalisis data dan membangun model ML.
+Kamu adalah Analisai, AI Data Analyst & ML Engineer ahli yang dibuat oleh Muhammad Ammar Arief. Bantu pengguna menganalisis data dan membangun model ML.
 
 Dataset di '/app/data/':
 {file_list}
 
 === ATURAN INTERAKSI ===
+- Jika pengguna bertanya siapa kamu atau siapa pembuatmu, jawab bahwa kamu adalah Analisai dan dibuat oleh Muhammad Ammar Arief
 - WAJIB tulis penjelasan teks SEBELUM menjalankan kode (jelaskan rencana singkat)
 - Sapa pengguna HANYA SEKALI di awal sesi. Jangan ulangi salam/sapaan
 - DILARANG mengakhiri respons dengan kalimat seperti "Ada lagi yang ingin Anda ketahui?", "Silakan tanyakan", "Semoga membantu", atau kalimat basa-basi penutup serupa
@@ -70,6 +72,9 @@ Jika diminta dashboard/UI Streamlit:
 2. Print: "[[STREAMLIT_APP]]nama_file.py[[/STREAMLIT_APP]]"
 3. Dalam kode Streamlit, gunakan path '/app/data/' untuk akses file
 4. Jangan jalankan streamlit — sistem otomatis menjalankannya
+5. PENTING: Di kode Streamlit, SELALU baca dari file data ASLI (CSV/Excel), JANGAN dari file .pkl intermediate
+   Contoh BENAR: pd.read_csv('/app/data/nama_file.csv')
+   Contoh SALAH: pd.read_pickle('/app/data/_ctx_clean.pkl')
 
 === SHARED CONTEXT ===
 Untuk efisiensi, simpan hasil intermediate. WAJIB gunakan pola aman berikut:
@@ -137,6 +142,251 @@ def _trim_content(text: str, max_len: int) -> str:
         return text
     half = max_len // 2
     return text[:half] + "\n... [dipotong] ...\n" + text[-half:]
+
+
+CLASSIFIER_PROMPT = """
+Tentukan apakah pertanyaan berikut adalah:
+
+1. smalltalk -> sapaan atau percakapan umum
+2. data_task -> permintaan analisis data atau machine learning
+
+Jawab hanya: smalltalk atau data_task
+"""
+
+
+SIMPLE_TASK_KEYWORDS = [
+    "jumlah baris",
+    "berapa baris",
+    "berapa kolom",
+    "kolom apa saja",
+    "5 baris pertama",
+    "head",
+    "missing value",
+    "shape",
+    "info dataset",
+]
+
+
+def _heuristic_route(question: str) -> str:
+    """Fallback route when classifier LLM is unavailable."""
+    q = (question or "").strip().lower()
+    if not q:
+        return "smalltalk"
+
+    greetings = {
+        "halo", "hai", "hi", "hello", "pagi", "siang", "sore", "malam",
+        "selamat pagi", "selamat siang", "selamat sore", "selamat malam",
+    }
+    casual = {
+        "makasih", "terima kasih", "thanks", "thx", "ok", "oke", "sip",
+        "siap", "mantap", "bagus", "baik", "halo bang", "halo kak",
+    }
+    analytic_keywords = {
+        "analisis", "dataset", "data", "csv", "excel", "prediksi", "model",
+        "regresi", "klasifikasi", "clustering", "visualisasi", "grafik", "chart",
+        "dashboard", "streamlit", "eda", "missing value", "outlier", "training",
+        "akurasi", "insight", "ringkasan", "kolom", "fitur", "preprocessing",
+    }
+
+    if q in greetings:
+        return "smalltalk"
+    if q in casual:
+        return "smalltalk"
+    if len(q.split()) <= 3 and not any(keyword in q for keyword in analytic_keywords):
+        return "smalltalk"
+    return "data_task"
+
+
+def _classify_request_type(question: str, model: str | None = None) -> str:
+    """Route user input with a lightweight classifier LLM."""
+    from backend.core.config import GOOGLE_API_KEY, MODEL_CHAT
+    import os
+
+    os.environ.setdefault("GOOGLE_API_KEY", GOOGLE_API_KEY)
+    model_name = model or MODEL_CHAT
+    user_input = (question or "").strip()
+    if not user_input:
+        return "smalltalk"
+
+    try:
+        llm = ChatGoogleGenerativeAI(model=model_name, temperature=0, max_output_tokens=16)
+        response = llm.invoke([
+            ("system", CLASSIFIER_PROMPT),
+            ("human", user_input),
+        ])
+        raw = response.content if isinstance(response.content, str) else extract_text(response.content)
+        label = (raw or "").strip().lower()
+        if "smalltalk" in label:
+            return "smalltalk"
+        if "data_task" in label:
+            return "data_task"
+    except Exception:
+        pass
+
+    return _heuristic_route(user_input)
+
+
+def _is_simple_data_task(question: str) -> bool:
+    q = (question or "").lower()
+    return any(keyword in q for keyword in SIMPLE_TASK_KEYWORDS)
+
+
+def _load_schema_payload(data_folder: Path) -> dict | None:
+    schema_path = data_folder / "_schema.json"
+    if not schema_path.exists():
+        return None
+    try:
+        payload = json.loads(schema_path.read_text(encoding="utf-8"))
+        if isinstance(payload, dict) and isinstance(payload.get("datasets"), list):
+            return payload
+    except Exception:
+        return None
+    return None
+
+
+def _load_schema_context(data_folder: Path) -> str:
+    payload = _load_schema_payload(data_folder)
+    if not payload:
+        return ""
+
+    datasets = payload.get("datasets", [])
+    if not datasets:
+        return ""
+
+    lines = ["\n=== DATASET SCHEMA MEMORY ==="]
+    lines.append("Gunakan schema ini sebagai konteks awal agar tidak selalu perlu membaca dataset dari nol.")
+    for item in datasets:
+        file_name = item.get("file", "unknown")
+        rows = item.get("rows", "?")
+        columns = item.get("columns", [])
+        types = item.get("types", {})
+        lines.append(f"- File: /app/data/{file_name}")
+        lines.append(f"  rows={rows}, columns={len(columns)}")
+        if columns:
+            lines.append("  nama_kolom=" + ", ".join(map(str, columns)))
+        if types:
+            type_summary = ", ".join(f"{col}:{dtype}" for col, dtype in list(types.items())[:20])
+            lines.append(f"  tipe={type_summary}")
+    lines.append("Tetap baca file bila perlu validasi nilai aktual, tetapi hindari preview berulang yang tidak perlu.")
+    return "\n".join(lines)
+
+
+def _answer_simple_task_from_schema(data_folder: Path, question: str) -> str | None:
+    payload = _load_schema_payload(data_folder)
+    if not payload:
+        return None
+
+    datasets = payload.get("datasets", [])
+    if not datasets:
+        return None
+
+    item = datasets[0]
+    q = (question or "").lower()
+    file_name = item.get("file", "dataset")
+    rows = item.get("rows")
+    columns = item.get("columns", []) or []
+    types = item.get("types", {}) or {}
+
+    if any(keyword in q for keyword in ["jumlah baris", "berapa baris"]):
+        return f"Jumlah baris pada {file_name} adalah {rows:,}.".replace(",", ".") if rows is not None else None
+    if any(keyword in q for keyword in ["berapa kolom", "jumlah kolom"]):
+        return f"Jumlah kolom pada {file_name} adalah {len(columns)}."
+    if any(keyword in q for keyword in ["kolom apa saja", "nama kolom"]):
+        if columns:
+            return f"Kolom pada {file_name}: {', '.join(map(str, columns))}."
+        return None
+    if "shape" in q:
+        if rows is not None:
+            return f"Shape {file_name} adalah ({rows}, {len(columns)})."
+        return None
+    if "info dataset" in q:
+        type_summary = ", ".join(f"{col}: {dtype}" for col, dtype in types.items())
+        return (
+            f"Info dataset {file_name}: jumlah baris {rows:,}, jumlah kolom {len(columns)}. ".replace(",", ".")
+            + (f"Tipe data kolom: {type_summary}." if type_summary else "")
+        )
+    return None
+
+
+def _run_direct_llm(question: str, history: list | None = None, model: str = None):
+    """Single lightweight LLM reply without planner/executor/insight orchestration."""
+    from backend.core.config import GOOGLE_API_KEY, MODEL_CHAT, MAX_HISTORY_MESSAGES, MAX_HISTORY_CONTENT_LEN
+    import os
+
+    os.environ.setdefault("GOOGLE_API_KEY", GOOGLE_API_KEY)
+    history = history or []
+    model_name = model or MODEL_CHAT
+
+    trimmed = history[-MAX_HISTORY_MESSAGES:]
+    history_text = ""
+    if trimmed:
+        lines = []
+        for role, content in trimmed:
+            speaker = "User" if role == "user" else "AI"
+            lines.append(f"{speaker}: {_trim_content(content, MAX_HISTORY_CONTENT_LEN)}")
+        history_text = "\n\nRiwayat percakapan:\n" + "\n".join(lines)
+
+    system = (
+        "Kamu adalah Analisai, AI Data Analyst yang ramah dan singkat, dibuat oleh Muhammad Ammar Arief. "
+        "Untuk small talk atau pertanyaan percakapan sederhana, jawab langsung tanpa membuat plan, "
+        "tanpa menyebut agent, dan tanpa langkah analisis. "
+        "Jika pengguna bertanya siapa kamu atau siapa pembuatmu, jawab bahwa kamu adalah Analisai dan dibuat oleh Muhammad Ammar Arief. "
+        "Jika pengguna belum meminta analisis data, arahkan secara singkat bahwa kamu siap membantu analisis data. "
+        "Gunakan bahasa Indonesia dan jangan bertele-tele."
+    )
+    human = f"Pesan pengguna: {question}{history_text}"
+
+    llm = ChatGoogleGenerativeAI(model=model_name, temperature=0.4, max_output_tokens=512)
+    response = llm.invoke([("system", system), ("human", human)])
+    text = response.content if isinstance(response.content, str) else extract_text(response.content)
+    if text:
+        yield {"type": "text", "content": text}
+    yield {"type": "done"}
+
+
+def _run_simple_data_task(data_folder: Path, question: str, model: str, file_list: str, schema_context: str):
+    """Run a simple data task with only the execution agent, without planner/insight."""
+    yield {"type": "agent_label", "content": "Execution"}
+
+    schema_answer = _answer_simple_task_from_schema(data_folder, question)
+    if schema_answer:
+        yield {"type": "text", "content": schema_answer}
+        yield {"type": "done"}
+        return
+
+    chart_rule = (
+        "\n=== ATURAN GRAFIK ===\n"
+        "Jangan pakai plt.show(). Gunakan:\n"
+        "import matplotlib.pyplot as plt\n"
+        "import uuid as _uuid\n"
+        "_chart_path = f\"/app/data/_chart_{_uuid.uuid4().hex}.png\"\n"
+        "plt.savefig(_chart_path, format='png', bbox_inches='tight', dpi=100)\n"
+        "plt.close()\n"
+        "print(f\"[[CHART_FILE]]{_chart_path}[[/CHART_FILE]]\")\n"
+    )
+    simple_prompt = (
+        "Kamu adalah Execution Agent untuk tugas data sederhana.\n\n"
+        f"Dataset di '/app/data/':\n{file_list}\n"
+        f"{schema_context}\n\n"
+        "Aturan:\n"
+        "- Kerjakan langsung tanpa membuat plan\n"
+        "- Fokus pada permintaan sederhana seperti shape, jumlah baris, jumlah kolom, head, missing values, atau info dataset\n"
+        "- Jika schema memory sudah cukup, gunakan itu. Baca dataset hanya jika memang perlu\n"
+        "- Berikan jawaban singkat dan langsung\n"
+        "- Gunakan bahasa Indonesia\n"
+        + chart_rule
+        + CONTEXT_RULE
+    )
+
+    collected_output = []
+    for event in _execute_task(data_folder, question, 0, 1, simple_prompt, model, "execution"):
+        if event["type"] == "_task_output":
+            collected_output.append(event["content"])
+            continue
+        yield event
+
+    _cleanup_context_files(data_folder)
+    yield {"type": "done"}
 
 
 CONTEXT_RULE = (
@@ -315,8 +565,18 @@ def run_agent_stream(data_folder: Path, question: str, history: list | None = No
     import os
     os.environ.setdefault("GOOGLE_API_KEY", GOOGLE_API_KEY)
 
+    request_type = _classify_request_type(question, model=MODEL_CHAT)
+    if request_type == "smalltalk":
+        yield from _run_direct_llm(question, history=history, model=MODEL_CHAT)
+        return
+
     history = history or []
     file_list = _list_data_contents(data_folder)
+    schema_context = _load_schema_context(data_folder)
+
+    if _is_simple_data_task(question):
+        yield from _run_simple_data_task(data_folder, question, MODEL_CHAT, file_list, schema_context)
+        return
 
     # Build history context for planner
     trimmed = history[-MAX_HISTORY_MESSAGES:]
@@ -336,6 +596,7 @@ def run_agent_stream(data_folder: Path, question: str, history: list | None = No
         "2. Membuat daftar tugas eksekusi yang konkret dan berurutan\n"
         "3. Menentukan fase eksekusi (task dengan fase sama bisa paralel)\n\n"
         f"Dataset tersedia di '/app/data/':\n{file_list}\n\n"
+        f"{schema_context}\n\n"
         "Kemampuan Execution Agent:\n"
         "- Analisis data, statistik, visualisasi, machine learning\n"
         "- Membuat dashboard/aplikasi Streamlit interaktif (.py) di /app/data/\n"
@@ -400,6 +661,8 @@ def run_agent_stream(data_folder: Path, question: str, history: list | None = No
         "- Tambahkan st.sidebar untuk filter/parameter\n"
         "- Gunakan st.metric() untuk menampilkan KPI/metrik utama\n"
         "- Tambahkan st.dataframe() dengan height parameter untuk tabel scrollable\n"
+        "- PENTING: SELALU baca dari file data ASLI (CSV/Excel), JANGAN dari file .pkl\n"
+        "  File pkl intermediate mungkin tidak tersedia di container Streamlit\n"
         "Contoh struktur:\n"
         "import streamlit as st\n"
         "import pandas as pd\n"
@@ -419,6 +682,7 @@ def run_agent_stream(data_folder: Path, question: str, history: list | None = No
     executor_base = (
         "Kamu adalah Execution Agent. Eksekusi tugas berikut menggunakan python_repl_tool.\n\n"
         f"Dataset di '/app/data/':\n{file_list}\n\n"
+        f"{schema_context}\n\n"
         "Aturan:\n"
         "- Langsung eksekusi menggunakan python_repl_tool\n"
         "- Jika error, perbaiki otomatis\n"
@@ -507,8 +771,18 @@ def run_pro_stream(data_folder: Path, question: str, history: list | None = None
     import os
     os.environ.setdefault("GOOGLE_API_KEY", GOOGLE_API_KEY)
 
+    request_type = _classify_request_type(question, model=MODEL_CHAT)
+    if request_type == "smalltalk":
+        yield from _run_direct_llm(question, history=history, model=MODEL_CHAT)
+        return
+
     history = history or []
     file_list = _list_data_contents(data_folder)
+    schema_context = _load_schema_context(data_folder)
+
+    if _is_simple_data_task(question):
+        yield from _run_simple_data_task(data_folder, question, MODEL_CHAT, file_list, schema_context)
+        return
 
     # ── Step 1: Planner Agent (MODEL_DEEP) ───────────────────────────────────
     yield {"type": "agent_label", "content": "Planner"}
@@ -520,6 +794,7 @@ def run_pro_stream(data_folder: Path, question: str, history: list | None = None
         "3. Menentukan agent yang tepat untuk setiap tugas\n"
         "4. Menentukan fase eksekusi (task dengan fase sama bisa paralel)\n\n"
         f"Dataset tersedia di '/app/data/':\n{file_list}\n\n"
+        f"{schema_context}\n\n"
         "Agent yang tersedia:\n"
         "- 'retrieval': memuat file, membaca CSV/data, melihat isi/struktur data, preview\n"
         "- 'analysis': analisis statistik, visualisasi, ML, preprocessing, generate Python,\n"
@@ -582,6 +857,8 @@ def run_pro_stream(data_folder: Path, question: str, history: list | None = None
         "- Tambahkan st.sidebar untuk filter/parameter\n"
         "- Gunakan st.metric() untuk menampilkan KPI/metrik utama\n"
         "- Tambahkan st.dataframe() dengan height parameter untuk tabel scrollable\n"
+        "- PENTING: SELALU baca dari file data ASLI (CSV/Excel), JANGAN dari file .pkl\n"
+        "  File pkl intermediate mungkin tidak tersedia di container Streamlit\n"
         "Contoh struktur:\n"
         "import streamlit as st\n"
         "import pandas as pd\n"
@@ -603,6 +880,7 @@ def run_pro_stream(data_folder: Path, question: str, history: list | None = None
     retrieval_base = (
         "Kamu adalah Data Retrieval Agent. Fokusmu adalah memuat dan membaca data.\n\n"
         f"Dataset di '/app/data/':\n{file_list}\n\n"
+        f"{schema_context}\n\n"
         "Aturan:\n"
         "- Gunakan pandas untuk membaca CSV, Excel, JSON, Parquet\n"
         "- Tampilkan shape, tipe kolom, beberapa baris pertama, info missing values\n"
@@ -615,6 +893,7 @@ def run_pro_stream(data_folder: Path, question: str, history: list | None = None
     analysis_base = (
         "Kamu adalah Analysis/Code Agent. Fokusmu adalah menganalisis data dan membangun model.\n\n"
         f"Dataset di '/app/data/':\n{file_list}\n\n"
+        f"{schema_context}\n\n"
         "Aturan:\n"
         "- Generate dan eksekusi Python untuk analisis statistik, visualisasi, atau ML\n"
         "- Jika error, perbaiki otomatis\n"
