@@ -8,17 +8,35 @@ services:
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     environment:
       APP_ENV: ${APP_ENV:-development}
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       SECRET_KEY: ${SECRET_KEY:-changeme-super-secret-key}
+      # Database
       MYSQL_URL: mysql+pymysql://${MYSQL_USER:-analyst}:${MYSQL_PASSWORD:-analyst_password}@mysql:3306/${MYSQL_DATABASE:-ai_analyst}
       REDIS_URL: redis://redis:6379/0
+      # MinIO
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
       MINIO_BUCKET: ${MINIO_BUCKET:-ai-datasets}
       MINIO_SECURE: "false"
+      # AI Provider
+      AI_PROVIDER: ${AI_PROVIDER:-google}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       MODEL_CHAT: ${MODEL_CHAT:-gemini-3.1-flash-lite-preview}
-      MODEL_DEEP: ${MODEL_DEEP:-gemini-3.1-pro-preview}
+      MODEL_DEEP: ${MODEL_DEEP:-}
+      MODEL_PLANNER: ${MODEL_PLANNER:-}
+      MODEL_EXECUTOR: ${MODEL_EXECUTOR:-}
+      MODEL_CRITIC: ${MODEL_CRITIC:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_HTTP_REFERER: ${OPENROUTER_HTTP_REFERER:-}
+      OPENROUTER_APP_TITLE: ${OPENROUTER_APP_TITLE:-Analisai}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      # Runtime limits
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+      MAX_UPLOAD_FILES: ${MAX_UPLOAD_FILES:-20}
+      CHAT_MAX_WORKERS: ${CHAT_MAX_WORKERS:-4}
+      MAX_HISTORY_MESSAGES: ${MAX_HISTORY_MESSAGES:-10}
+      MAX_HISTORY_CONTENT_LEN: ${MAX_HISTORY_CONTENT_LEN:-2000}
     ports:
       - "8000:8000"
     volumes:
@@ -40,20 +58,39 @@ services:
     command: python -m backend.worker_main
     environment:
       APP_ENV: ${APP_ENV:-development}
-      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       SECRET_KEY: ${SECRET_KEY:-changeme-super-secret-key}
+      # Database
       MYSQL_URL: mysql+pymysql://${MYSQL_USER:-analyst}:${MYSQL_PASSWORD:-analyst_password}@mysql:3306/${MYSQL_DATABASE:-ai_analyst}
       REDIS_URL: redis://redis:6379/0
+      # MinIO
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
       MINIO_BUCKET: ${MINIO_BUCKET:-ai-datasets}
       MINIO_SECURE: "false"
+      # AI Provider
+      AI_PROVIDER: ${AI_PROVIDER:-google}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       MODEL_CHAT: ${MODEL_CHAT:-gemini-3.1-flash-lite-preview}
-      MODEL_DEEP: ${MODEL_DEEP:-gemini-3.1-pro-preview}
+      MODEL_DEEP: ${MODEL_DEEP:-}
+      MODEL_PLANNER: ${MODEL_PLANNER:-}
+      MODEL_EXECUTOR: ${MODEL_EXECUTOR:-}
+      MODEL_CRITIC: ${MODEL_CRITIC:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_HTTP_REFERER: ${OPENROUTER_HTTP_REFERER:-}
+      OPENROUTER_APP_TITLE: ${OPENROUTER_APP_TITLE:-Analisai}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      # Sandbox limits
       SANDBOX_TIMEOUT: ${SANDBOX_TIMEOUT:-120}
       SANDBOX_MEM_LIMIT: ${SANDBOX_MEM_LIMIT:-512m}
       SANDBOX_CPU_QUOTA: ${SANDBOX_CPU_QUOTA:-100000}
+      # Runtime limits
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+      MAX_UPLOAD_FILES: ${MAX_UPLOAD_FILES:-20}
+      CHAT_MAX_WORKERS: ${CHAT_MAX_WORKERS:-4}
+      MAX_HISTORY_MESSAGES: ${MAX_HISTORY_MESSAGES:-10}
+      MAX_HISTORY_CONTENT_LEN: ${MAX_HISTORY_CONTENT_LEN:-2000}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /tmp:/tmp
@@ -79,7 +116,17 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD:-root_password}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -71,7 +71,7 @@ def get_events_from(user_id: str, job_id: str, start: int = 0) -> list[dict]:
     for r in raw:
         try:
             result.append(json.loads(r))
-        except Exception:
+        except (json.JSONDecodeError, TypeError):
             pass
     return result
 
@@ -98,7 +98,7 @@ def get_active_job(user_id: str, session_id: str) -> dict | None:
         return None
     try:
         return json.loads(raw)
-    except Exception:
+    except (json.JSONDecodeError, TypeError):
         return None
 
 
@@ -122,5 +122,5 @@ def dequeue_job(timeout: int = 5) -> dict | None:
     _, raw = item
     try:
         return json.loads(raw)
-    except Exception:
+    except (json.JSONDecodeError, TypeError):
         return None

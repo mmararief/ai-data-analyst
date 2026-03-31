@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -43,6 +44,11 @@
   --scrollbar-thumb: #cbd5e1;
   --scrollbar-thumb-hover: #94a3b8;
 
+  /* Analisai Specific */
+  --analisai-bg: #f8fafc;
+  --analisai-cyan: #0284c7;
+  --analisai-text: #0f172a;
+
   color-scheme: light;
 }
 
@@ -82,6 +88,14 @@
 
   --scrollbar-thumb: #1e293b;
   --scrollbar-thumb-hover: #334155;
+
+  /* Analisai Specific */
+  --analisai-bg: #03050f;
+  --analisai-bg2: #060916;
+  --analisai-bg3: #0a0e1a;
+  --analisai-cyan: #38bdf8;
+  --analisai-cyan2: #0ea5e9;
+  --analisai-text: #e2e8f0;
 
   color-scheme: dark;
 }

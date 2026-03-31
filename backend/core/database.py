@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String
+from sqlalchemy import create_engine, Column, String, Text, DateTime, ForeignKey, func
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 try:
@@ -19,6 +19,16 @@ class UserRow(Base):
     user_id = Column(String(36), primary_key=True, index=True)
     username = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
+
+
+class ProjectRow(Base):
+    __tablename__ = "projects"
+    project_id = Column(String(36), primary_key=True, index=True)
+    user_id = Column(String(36), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(120), nullable=False)
+    description = Column(Text, default="")
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 def init_db():

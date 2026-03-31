@@ -37,8 +37,18 @@ DATASETS_ROOT = Path(__file__).resolve().parents[2] / "datasets"
 DATASETS_ROOT.mkdir(exist_ok=True)
 
 # AI Model settings
+AI_PROVIDER: str = os.environ.get("AI_PROVIDER", "google").lower()
 MODEL_CHAT: str = os.environ.get("MODEL_CHAT", "gemini-3.1-flash-lite-preview")
 MODEL_DEEP: str = os.environ.get("MODEL_DEEP", "gemini-3.1-pro-preview")
+# Per-role model overrides (defaults to MODEL_CHAT if not set)
+MODEL_PLANNER: str = os.environ.get("MODEL_PLANNER", "") or MODEL_CHAT
+MODEL_EXECUTOR: str = os.environ.get("MODEL_EXECUTOR", "") or MODEL_CHAT
+MODEL_CRITIC: str = os.environ.get("MODEL_CRITIC", "") or MODEL_CHAT
+OLLAMA_BASE_URL: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+OPENROUTER_API_KEY: str = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL: str = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+OPENROUTER_HTTP_REFERER: str = os.environ.get("OPENROUTER_HTTP_REFERER", "")
+OPENROUTER_APP_TITLE: str = os.environ.get("OPENROUTER_APP_TITLE", "Analisai")
 
 # Sandbox limits
 SANDBOX_TIMEOUT: int = int(os.environ.get("SANDBOX_TIMEOUT", "120"))   # detik
@@ -53,3 +63,7 @@ MAX_HISTORY_CONTENT_LEN: int = int(os.environ.get("MAX_HISTORY_CONTENT_LEN", "20
 MAX_UPLOAD_MB: int = int(os.environ.get("MAX_UPLOAD_MB", "25"))
 MAX_UPLOAD_FILES: int = int(os.environ.get("MAX_UPLOAD_FILES", "20"))
 CHAT_MAX_WORKERS: int = int(os.environ.get("CHAT_MAX_WORKERS", "4"))
+
+# Web Search (Tavily)
+TAVILY_API_KEY: str = os.environ.get("TAVILY_API_KEY", "")
+WEB_SEARCH_ENABLED: bool = bool(TAVILY_API_KEY)

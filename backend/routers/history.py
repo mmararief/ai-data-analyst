@@ -25,34 +25,35 @@ class SaveRequest(BaseModel):
     messages: List[MsgItem]
 
 
-@router.get("/")
-def list_sessions_route(user: UserInDB = Depends(get_current_user)):
-    return {"sessions": list_sessions(user.user_id)}
+@router.get("/{project_id}")
+def list_sessions_route(project_id: str, user: UserInDB = Depends(get_current_user)):
+    return {"sessions": list_sessions(user.user_id, project_id=project_id)}
 
 
-@router.post("/save")
-def save_session_route(req: SaveRequest, user: UserInDB = Depends(get_current_user)):
+@router.post("/{project_id}/save")
+def save_session_route(project_id: str, req: SaveRequest, user: UserInDB = Depends(get_current_user)):
     sid = req.session_id or str(uuid.uuid4())
     save_session(
         user_id=user.user_id,
         session_id=sid,
         title=req.title,
-        messages=[m.dict() for m in req.messages],
+        messages=[m.model_dump() for m in req.messages],
+        project_id=project_id,
     )
     return {"session_id": sid}
 
 
-@router.get("/{session_id}")
-def get_session_route(session_id: str, user: UserInDB = Depends(get_current_user)):
-    data = get_session(user.user_id, session_id)
-    if data is None:
+@router.get("/{project_id}/{session_id}")
+def get_session_route(project_id: str, session_id: str, user: UserInDB = Depends(get_current_user)):
+    data = get_session(user.user_id, project_id, session_id)
+    if not data:
         raise HTTPException(404, "Session tidak ditemukan")
     return data
 
 
-@router.delete("/{session_id}")
-def delete_session_route(session_id: str, user: UserInDB = Depends(get_current_user)):
-    found = delete_session(user.user_id, session_id)
+@router.delete("/{project_id}/{session_id}")
+def delete_session_route(project_id: str, session_id: str, user: UserInDB = Depends(get_current_user)):
+    found = delete_session(user.user_id, project_id, session_id)
     if not found:
         raise HTTPException(404, "Session tidak ditemukan")
     return {"message": "Dihapus"}

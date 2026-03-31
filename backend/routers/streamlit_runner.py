@@ -52,6 +52,7 @@ def _get_used_ports() -> set[int]:
 
 class RunRequest(BaseModel):
     filename: str
+    project_id: str
 
 
 @router.post("/run")
@@ -59,9 +60,8 @@ def run_streamlit(req: RunRequest, request: Request, user: UserInDB = Depends(ge
     if not req.filename.endswith(".py") or ".." in req.filename or "/" in req.filename or "\\" in req.filename:
         raise HTTPException(400, "Nama file tidak valid")
 
-    # Verify file exists in MinIO before starting
     from backend.core.minio_store import object_exists
-    if not object_exists(user.user_id, req.filename):
+    if not object_exists(user.user_id, req.filename, project_id=req.project_id):
         raise HTTPException(404, "File tidak ditemukan")
 
     client = docker.from_env()
@@ -93,7 +93,7 @@ def run_streamlit(req: RunRequest, request: Request, user: UserInDB = Depends(ge
     # Download user files to a temp dir, then mount it
     tmp = Path(tempfile.mkdtemp(prefix=f"stl_{user.user_id[:8]}_"))
     try:
-        download_user_files(user.user_id, tmp)
+        download_user_files(user.user_id, tmp, project_id=req.project_id)
     except Exception as e:
         shutil.rmtree(tmp, ignore_errors=True)
         raise HTTPException(500, f"Gagal menyiapkan data: {str(e)}")

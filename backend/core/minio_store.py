@@ -2,7 +2,7 @@
 MinIO client untuk penyimpanan dataset pengguna.
 
 Bucket  : ai-datasets  (konfigurasi via MINIO_BUCKET)
-Layout  : datasets/{user_id}/{relative_path}
+Layout  : datasets/{user_id}/{project_id}/{relative_path}
 
 File internal runtime yang tidak disimpan ke MinIO:
     - _exec_script.py   (skrip sandbox sementara)
@@ -58,7 +58,9 @@ def _ensure_bucket(client: Minio) -> None:
         pass
 
 
-def _user_prefix(user_id: str) -> str:
+def _user_prefix(user_id: str, project_id: str | None = None) -> str:
+    if project_id:
+        return f"datasets/{user_id}/{project_id}/"
     return f"datasets/{user_id}/"
 
 
@@ -72,11 +74,19 @@ def _is_list_hidden(name: str) -> bool:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def list_user_objects(user_id: str) -> list[dict]:
-    """Daftar top-level file dan folder untuk satu user (non-recursive)."""
+def list_user_objects(
+    user_id: str,
+    relative_prefix: str = "",
+    *,
+    project_id: str | None = None,
+) -> list[dict]:
+    """Daftar file/folder pada level prefix tertentu (non-recursive)."""
     client = _get_client()
     _ensure_bucket(client)
-    prefix = _user_prefix(user_id)
+    rel = (relative_prefix or "").strip("/")
+    prefix = _user_prefix(user_id, project_id)
+    if rel:
+        prefix = f"{prefix}{rel}/"
     items: list[dict] = []
     try:
         for obj in client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=False):
@@ -85,6 +95,7 @@ def list_user_objects(user_id: str) -> list[dict]:
                 continue
             if obj.is_dir:
                 folder_name = name.rstrip("/")
+                full_path = f"{rel}/{folder_name}" if rel else folder_name
                 img_count = 0
                 size_kb = 0.0
                 for sub in client.list_objects(MINIO_BUCKET, prefix=obj.object_name, recursive=True):
@@ -93,6 +104,7 @@ def list_user_objects(user_id: str) -> list[dict]:
                         img_count += 1
                 items.append({
                     "name": folder_name,
+                    "path": full_path,
                     "size_kb": round(size_kb, 1),
                     "type": "folder",
                     "image_count": img_count,
@@ -100,8 +112,10 @@ def list_user_objects(user_id: str) -> list[dict]:
             else:
                 if _is_list_hidden(name):
                     continue
+                full_path = f"{rel}/{name}" if rel else name
                 items.append({
-                    "name": name,
+                    "name": Path(name).name,
+                    "path": full_path,
                     "size_kb": round((obj.size or 0) / 1024, 1),
                     "type": "file",
                 })
@@ -113,11 +127,13 @@ def list_user_objects(user_id: str) -> list[dict]:
 def put_object_bytes(
     user_id: str, obj_path: str, data: bytes,
     content_type: str = "application/octet-stream",
+    *,
+    project_id: str | None = None,
 ) -> None:
-    """Upload bytes ke MinIO. obj_path relatif terhadap user prefix."""
+    """Upload bytes ke MinIO. obj_path relatif terhadap user/project prefix."""
     client = _get_client()
     _ensure_bucket(client)
-    obj_name = f"{_user_prefix(user_id)}{obj_path}"
+    obj_name = f"{_user_prefix(user_id, project_id)}{obj_path}"
     client.put_object(
         MINIO_BUCKET, obj_name,
         io.BytesIO(data), length=len(data),
@@ -125,10 +141,10 @@ def put_object_bytes(
     )
 
 
-def get_object_bytes(user_id: str, obj_path: str) -> bytes:
+def get_object_bytes(user_id: str, obj_path: str, *, project_id: str | None = None) -> bytes:
     """Download object sebagai bytes. Raise S3Error jika tidak ada."""
     client = _get_client()
-    resp = client.get_object(MINIO_BUCKET, f"{_user_prefix(user_id)}{obj_path}")
+    resp = client.get_object(MINIO_BUCKET, f"{_user_prefix(user_id, project_id)}{obj_path}")
     try:
         return resp.read()
     finally:
@@ -136,44 +152,61 @@ def get_object_bytes(user_id: str, obj_path: str) -> bytes:
         resp.release_conn()
 
 
-def object_exists(user_id: str, obj_path: str) -> bool:
+def object_exists(user_id: str, obj_path: str, *, project_id: str | None = None) -> bool:
     client = _get_client()
     try:
-        client.stat_object(MINIO_BUCKET, f"{_user_prefix(user_id)}{obj_path}")
+        client.stat_object(MINIO_BUCKET, f"{_user_prefix(user_id, project_id)}{obj_path}")
         return True
     except S3Error:
         return False
 
 
-def prefix_has_objects(user_id: str, folder_name: str) -> bool:
+def prefix_has_objects(user_id: str, folder_name: str, *, project_id: str | None = None) -> bool:
     """Cek apakah suatu folder prefix punya isi."""
     client = _get_client()
-    prefix = f"{_user_prefix(user_id)}{folder_name}/"
+    prefix = f"{_user_prefix(user_id, project_id)}{folder_name}/"
     try:
         return any(True for _ in client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=False))
     except S3Error:
         return False
 
 
-def remove_object(user_id: str, obj_path: str) -> None:
+def remove_object(user_id: str, obj_path: str, *, project_id: str | None = None) -> None:
     """Hapus satu object."""
     client = _get_client()
-    client.remove_object(MINIO_BUCKET, f"{_user_prefix(user_id)}{obj_path}")
+    client.remove_object(MINIO_BUCKET, f"{_user_prefix(user_id, project_id)}{obj_path}")
 
 
-def remove_prefix(user_id: str, folder_name: str) -> None:
+def remove_prefix(user_id: str, folder_name: str, *, project_id: str | None = None) -> None:
     """Hapus semua object di bawah folder prefix secara rekursif."""
     client = _get_client()
-    prefix = f"{_user_prefix(user_id)}{folder_name}/"
+    prefix = f"{_user_prefix(user_id, project_id)}{folder_name}/"
     for obj in client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=True):
         client.remove_object(MINIO_BUCKET, obj.object_name)
 
 
-def download_user_files(user_id: str, target_dir: Path) -> None:
-    """Download semua file user dari MinIO ke target_dir (untuk sandbox)."""
+def remove_project_files(user_id: str, project_id: str) -> None:
+    """Bulk-delete semua file di bawah prefix project."""
     client = _get_client()
     _ensure_bucket(client)
-    prefix = _user_prefix(user_id)
+    prefix = _user_prefix(user_id, project_id)
+    try:
+        for obj in client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=True):
+            client.remove_object(MINIO_BUCKET, obj.object_name)
+    except S3Error:
+        pass
+
+
+def download_user_files(
+    user_id: str,
+    target_dir: Path,
+    *,
+    project_id: str | None = None,
+) -> None:
+    """Download semua file user/project dari MinIO ke target_dir (untuk sandbox)."""
+    client = _get_client()
+    _ensure_bucket(client)
+    prefix = _user_prefix(user_id, project_id)
     target_dir.mkdir(parents=True, exist_ok=True)
     try:
         for obj in client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=True):
@@ -189,14 +222,19 @@ def download_user_files(user_id: str, target_dir: Path) -> None:
         pass
 
 
-def upload_generated_files(user_id: str, source_dir: Path) -> None:
+def upload_generated_files(
+    user_id: str,
+    source_dir: Path,
+    *,
+    project_id: str | None = None,
+) -> None:
     """
     Upload file yang baru di-generate di source_dir kembali ke MinIO.
     Hanya upload file yang belum ada di MinIO sebelum sandbox run.
     """
     client = _get_client()
     _ensure_bucket(client)
-    prefix = _user_prefix(user_id)
+    prefix = _user_prefix(user_id, project_id)
 
     existing: set[str] = set()
     try:
@@ -217,7 +255,7 @@ def upload_generated_files(user_id: str, source_dir: Path) -> None:
 
 
 @contextmanager
-def sandbox_context(user_id: str):
+def sandbox_context(user_id: str, *, project_id: str | None = None):
     """
     Context manager: download file user dari MinIO ke temp dir,
     yield Path untuk sandbox, lalu upload file baru yang di-generate balik ke MinIO.
@@ -225,8 +263,8 @@ def sandbox_context(user_id: str):
     """
     tmp = Path(tempfile.mkdtemp(prefix=f"sbx_{user_id[:8]}_"))
     try:
-        download_user_files(user_id, tmp)
+        download_user_files(user_id, tmp, project_id=project_id)
         yield tmp
-        upload_generated_files(user_id, tmp)
+        upload_generated_files(user_id, tmp, project_id=project_id)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

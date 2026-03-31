@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from backend.core.security import get_current_user
 from backend.models.user import UserInDB
-from backend.agent_runner import run_agent_stream, run_pro_stream
+from backend.agent_runner import run_agent_stream
 from backend.core.minio_store import download_user_files, upload_generated_files
 from backend.core.job_store import (
     create_job, get_status, get_events_from, enqueue_job,
@@ -28,17 +28,14 @@ class HistoryMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     question: str
-    history: Optional[List[HistoryMessage]] = Field(default_factory=list)
-
-class ProRequest(BaseModel):
-    question: str
+    project_id: str
     history: Optional[List[HistoryMessage]] = Field(default_factory=list)
 
 class StartRequest(BaseModel):
     question: str
+    project_id: str
     history: Optional[List[HistoryMessage]] = Field(default_factory=list)
-    mode: str = "normal"        # "normal" | "pro"
-    session_id: Optional[str] = None  # supply existing, or None to get a new one
+    session_id: Optional[str] = None
 
 
 # ── Existing endpoints (kept for backward compat) ──────────────────────────
@@ -51,32 +48,10 @@ def chat_stream(req: ChatRequest, user: UserInDB = Depends(get_current_user)):
     def event_generator():
         tmp = Path(tempfile.mkdtemp(prefix=f"sbx_{user_id[:8]}_"))
         try:
-            download_user_files(user_id, tmp)
+            download_user_files(user_id, tmp, project_id=req.project_id)
             for event in run_agent_stream(tmp, req.question, history=history):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-            upload_generated_files(user_id, tmp)
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
-
-
-@router.post("/pro")
-def pro_stream(req: ProRequest, user: UserInDB = Depends(get_current_user)):
-    history = [(m.role, m.content) for m in req.history] if req.history else []
-    user_id = user.user_id
-
-    def event_generator():
-        tmp = Path(tempfile.mkdtemp(prefix=f"sbx_{user_id[:8]}_"))
-        try:
-            download_user_files(user_id, tmp)
-            for event in run_pro_stream(tmp, req.question, history=history):
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-            upload_generated_files(user_id, tmp)
+            upload_generated_files(user_id, tmp, project_id=req.project_id)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
@@ -106,9 +81,9 @@ def chat_start(req: StartRequest, user: UserInDB = Depends(get_current_user)):
         "job_id": job_id,
         "user_id": user_id,
         "session_id": session_id,
+        "project_id": req.project_id,
         "question": req.question,
         "history": history,
-        "mode": req.mode,
         "submitted_at": time.time(),
     })
     return {"job_id": job_id, "session_id": session_id}
@@ -181,7 +156,6 @@ def get_session_active_job(
     job_id = info["job_id"]
     status = get_status(user.user_id, job_id)
     if status is None or status not in ("queued", "running"):
-        # Job ended but active marker wasn't cleared yet (race condition) — clean up
         clear_active_job(user.user_id, session_id)
         return {"active": False, "done": status == "done"}
 
@@ -191,4 +165,3 @@ def get_session_active_job(
         "question": info.get("question", ""),
         "status": status,
     }
-

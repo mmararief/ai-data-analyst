@@ -1,41 +1,89 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import AuthPage from './pages/AuthPage'
+import DashboardPage from './pages/DashboardPage'
 import ChatPage from './pages/ChatPage'
 
-function getSessionFromUrl() {
-  const m = window.location.pathname.match(/^\/chat\/([a-zA-Z0-9-]+)$/)
-  return m ? m[1] : null
+function AuthGuard({ children, isAuthenticated }) {
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return children
+}
+
+function HomeWrapper() {
+  const navigate = useNavigate()
+  return <HomePage onStart={() => navigate('/login')} />
 }
 
 export default function App() {
-  const [username, setUsername] = useState(null)
-  const [showAuth, setShowAuth] = useState(false)
-  const [initialSessionId] = useState(getSessionFromUrl)
-
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    const savedUser = localStorage.getItem('username')
-    if (token && savedUser) {
-      setUsername(savedUser)
-    }
-  }, [])
+  const [username, setUsername] = useState(() => localStorage.getItem('username'))
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => !!(localStorage.getItem('token') && localStorage.getItem('username'))
+  )
 
   const handleLogin = (user) => {
     localStorage.setItem('username', user)
     setUsername(user)
-    setShowAuth(false)
+    setIsAuthenticated(true)
   }
 
   const handleLogout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('username')
     setUsername(null)
-    setShowAuth(false)
-    window.history.replaceState({}, '', '/')
+    setIsAuthenticated(false)
   }
 
-  if (username) return <ChatPage username={username} onLogout={handleLogout} initialSessionId={initialSessionId} />
-  if (showAuth) return <AuthPage onLogin={handleLogin} onBack={() => setShowAuth(false)} />
-  return <HomePage onStart={() => setShowAuth(true)} />
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public routes */}
+        <Route
+          path="/login"
+          element={
+            isAuthenticated
+              ? <Navigate to="/" replace />
+              : <AuthPage onLogin={handleLogin} />
+          }
+        />
+        <Route
+          path="/welcome"
+          element={
+            <Navigate to="/" replace />
+          }
+        />
+
+        {/* Root: public home when belum login, dashboard ketika sudah login */}
+        <Route
+          path="/"
+          element={
+            isAuthenticated
+              ? <DashboardPage username={username} onLogout={handleLogout} />
+              : <HomeWrapper />
+          }
+        />
+
+        {/* Protected routes */}
+        <Route
+          path="/project/:projectId"
+          element={
+            <AuthGuard isAuthenticated={isAuthenticated}>
+              <ChatPage username={username} onLogout={handleLogout} />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/project/:projectId/chat/:sessionId"
+          element={
+            <AuthGuard isAuthenticated={isAuthenticated}>
+              <ChatPage username={username} onLogout={handleLogout} />
+            </AuthGuard>
+          }
+        />
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }

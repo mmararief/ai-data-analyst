@@ -8,6 +8,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,          // bind ke 0.0.0.0 agar bisa di-forward VS Code tunnel
+    allowedHosts: ['75f2-125-160-238-93.ngrok-free.app', '.ngrok-free.app'],
     proxy: {
       '/streamlit/app': {
         target: 'http://localhost:8501',
@@ -23,7 +24,9 @@ export default defineConfig({
           if (req.headers.accept?.includes('text/html')) return req.url
         },
       },
+      '/projects': 'http://localhost:8000',
       '/datasets': 'http://localhost:8000',
+      '/automl': 'http://localhost:8000',
       '/notebook': 'http://localhost:8000',
       '/history': 'http://localhost:8000',
       '/streamlit': 'http://localhost:8000',

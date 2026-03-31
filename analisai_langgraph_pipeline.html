@@ -1,0 +1,305 @@
+<style>
+@keyframes flowDash { to { stroke-dashoffset: -24; } }
+@keyframes pulseNode { 0%,100%{opacity:1} 50%{opacity:.65} }
+@keyframes slideIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes packetMove { 0%{opacity:0;offset-distance:0%} 10%{opacity:1} 90%{opacity:1} 100%{opacity:0;offset-distance:100%} }
+
+.flow-line { stroke-dasharray: 6 6; animation: flowDash 1.4s linear infinite; }
+.flow-line.slow { animation-duration: 2.2s; }
+.flow-line.fast { animation-duration: 0.9s; }
+
+.node-active { animation: pulseNode 2s ease-in-out infinite; }
+
+.packet {
+  width: 8px; height: 8px; border-radius: 50%;
+  position: absolute;
+  animation: packetMove 2.4s ease-in-out infinite;
+  offset-rotate: 0deg;
+}
+
+.stage-card {
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-tertiary);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color .2s, transform .15s;
+  user-select: none;
+}
+.stage-card:hover { border-color: var(--color-border-primary); transform: translateY(-2px); }
+.stage-card.active { border-color: #38bdf8; background: color-mix(in srgb, #38bdf8 6%, var(--color-background-secondary)); }
+.stage-card.done { border-color: #22c55e; background: color-mix(in srgb, #22c55e 5%, var(--color-background-secondary)); }
+.stage-card.warn { border-color: #f59e0b; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 500; padding: 2px 8px;
+  border-radius: 99px; font-family: var(--font-mono);
+}
+.badge-blue { background: #0ea5e910; color: #0ea5e9; border: 0.5px solid #0ea5e930; }
+.badge-purple { background: #a855f710; color: #a855f7; border: 0.5px solid #a855f730; }
+.badge-teal { background: #14b8a610; color: #14b8a6; border: 0.5px solid #14b8a630; }
+.badge-amber { background: #f59e0b10; color: #f59e0b; border: 0.5px solid #f59e0b30; }
+.badge-green { background: #22c55e10; color: #22c55e; border: 0.5px solid #22c55e30; }
+
+.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.dot-active { background: #38bdf8; box-shadow: 0 0 0 3px #38bdf820; animation: pulseNode 1.5s ease-in-out infinite; }
+.dot-done { background: #22c55e; }
+.dot-idle { background: var(--color-border-secondary); }
+
+.log-line { font-family: var(--font-mono); font-size: 12px; color: var(--color-text-secondary); padding: 2px 0; animation: slideIn .3s ease both; }
+.log-line.info { color: #38bdf8; }
+.log-line.success { color: #22c55e; }
+.log-line.warn { color: #f59e0b; }
+
+.connector-v {
+  width: 1px; background: var(--color-border-tertiary);
+  margin: 0 auto; position: relative; overflow: visible;
+}
+.connector-h { height: 1px; background: var(--color-border-tertiary); flex: 1; }
+</style>
+
+<div style="padding: 1rem 0;">
+
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <div style="font-size:13px; font-weight:500; color:var(--color-text-primary)">Pipeline eksekusi</div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <span id="status-badge" class="badge badge-blue">
+      <span class="dot dot-active"></span> menunggu input
+    </span>
+    <button onclick="runDemo()" style="font-size:12px;padding:4px 12px;border-radius:6px;">Jalankan demo</button>
+    <button onclick="resetDemo()" style="font-size:12px;padding:4px 12px;border-radius:6px;">Reset</button>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns: 1fr 28px 1fr 28px 1fr 28px 1fr; gap:0; align-items:center; margin-bottom:20px;">
+
+  <div id="card-classifier" class="stage-card" onclick="sendPrompt('Bagaimana classifier menentukan routing request?')">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <span class="badge badge-blue">Classifier</span>
+      <span id="dot-classifier" class="dot dot-idle"></span>
+    </div>
+    <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">Route request</div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);">smalltalk / model_build / simple / complex</div>
+  </div>
+
+  <svg width="28" height="20" viewBox="0 0 28 20" style="flex-shrink:0;">
+    <line id="arr1" x1="0" y1="10" x2="20" y2="10" stroke="var(--color-border-secondary)" stroke-width="1" class="flow-line"/>
+    <path d="M18 6 L24 10 L18 14" fill="none" stroke="var(--color-border-secondary)" stroke-width="1" stroke-linecap="round"/>
+  </svg>
+
+  <div id="card-planner" class="stage-card" onclick="sendPrompt('Bagaimana Planner Agent membuat rencana tugas?')">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <span class="badge badge-purple">Planner Agent</span>
+      <span id="dot-planner" class="dot dot-idle"></span>
+    </div>
+    <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">Buat rencana</div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);">JSON tasks dengan phase paralel</div>
+  </div>
+
+  <svg width="28" height="20" viewBox="0 0 28 20" style="flex-shrink:0;">
+    <line x1="0" y1="10" x2="20" y2="10" stroke="var(--color-border-secondary)" stroke-width="1" class="flow-line slow"/>
+    <path d="M18 6 L24 10 L18 14" fill="none" stroke="var(--color-border-secondary)" stroke-width="1" stroke-linecap="round"/>
+  </svg>
+
+  <div id="card-executor" class="stage-card" onclick="sendPrompt('Bagaimana Executor Agent menjalankan tasks secara paralel?')">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <span class="badge badge-teal">Executor Agent</span>
+      <span id="dot-executor" class="dot dot-idle"></span>
+    </div>
+    <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">Eksekusi paralel</div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);">Python sandbox per phase</div>
+  </div>
+
+  <svg width="28" height="20" viewBox="0 0 28 20" style="flex-shrink:0;">
+    <line x1="0" y1="10" x2="20" y2="10" stroke="var(--color-border-secondary)" stroke-width="1" class="flow-line"/>
+    <path d="M18 6 L24 10 L18 14" fill="none" stroke="var(--color-border-secondary)" stroke-width="1" stroke-linecap="round"/>
+  </svg>
+
+  <div id="card-critic" class="stage-card" onclick="sendPrompt('Kapan Critic Agent memutuskan refine vs ok?')">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <span class="badge badge-amber">Critic Agent</span>
+      <span id="dot-critic" class="dot dot-idle"></span>
+    </div>
+    <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px;">Evaluasi hasil</div>
+    <div style="font-size:11px;color:var(--color-text-tertiary);">ok / refine + additional_tasks</div>
+  </div>
+
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+
+  <div style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:10px;padding:12px;">
+    <div style="font-size:11px;font-weight:500;color:var(--color-text-tertiary);margin-bottom:10px;font-family:var(--font-mono);">TOOLS TERSEDIA</div>
+    <div style="display:flex;flex-direction:column;gap:6px;">
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-text-secondary);">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="2" stroke="#38bdf8" stroke-width="1"/><path d="M4 7h3M4 9.5h5" stroke="#38bdf8" stroke-width="1" stroke-linecap="round"/></svg>
+        python_repl_tool
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-text-secondary);">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#a855f7" stroke-width="1"/><path d="M8 5v3l2 2" stroke="#a855f7" stroke-width="1" stroke-linecap="round"/></svg>
+        automl_train_tool
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-text-secondary);">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M3 8h7M3 12h5" stroke="#14b8a6" stroke-width="1" stroke-linecap="round"/></svg>
+        automl_list_models_tool
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-text-secondary);">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 8h3l2-5 3 10 2-5h2" stroke="#f59e0b" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        automl_predict_tool
+      </div>
+    </div>
+  </div>
+
+  <div style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:10px;padding:12px;">
+    <div style="font-size:11px;font-weight:500;color:var(--color-text-tertiary);margin-bottom:10px;font-family:var(--font-mono);">EXECUTION LOG</div>
+    <div id="log-container" style="display:flex;flex-direction:column;gap:2px;min-height:80px;">
+      <div class="log-line" style="color:var(--color-text-tertiary);">— menunggu —</div>
+    </div>
+  </div>
+
+</div>
+
+<div style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:10px;padding:12px;">
+  <div style="font-size:11px;font-weight:500;color:var(--color-text-tertiary);margin-bottom:10px;font-family:var(--font-mono);">CONTOH FASE PARALEL — phase 1</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+    <div id="task-a" style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:8px;padding:10px;font-size:12px;">
+      <div style="font-family:var(--font-mono);color:var(--color-text-tertiary);font-size:10px;margin-bottom:4px;">TASK 1</div>
+      <div style="color:var(--color-text-secondary);">Statistik deskriptif</div>
+      <div id="task-a-status" style="font-size:10px;color:var(--color-text-tertiary);margin-top:4px;">idle</div>
+    </div>
+    <div id="task-b" style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:8px;padding:10px;font-size:12px;">
+      <div style="font-family:var(--font-mono);color:var(--color-text-tertiary);font-size:10px;margin-bottom:4px;">TASK 2</div>
+      <div style="color:var(--color-text-secondary);">Distribusi & korelasi</div>
+      <div id="task-b-status" style="font-size:10px;color:var(--color-text-tertiary);margin-top:4px;">idle</div>
+    </div>
+    <div id="task-c" style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:8px;padding:10px;font-size:12px;">
+      <div style="font-family:var(--font-mono);color:var(--color-text-tertiary);font-size:10px;margin-bottom:4px;">TASK 3</div>
+      <div style="color:var(--color-text-secondary);">Deteksi outlier</div>
+      <div id="task-c-status" style="font-size:10px;color:var(--color-text-tertiary);margin-top:4px;">idle</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+let running = false;
+let timers = [];
+
+function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+function t(fn, ms) { timers.push(setTimeout(fn, ms)); }
+
+function log(msg, cls='') {
+  const c = document.getElementById('log-container');
+  if (c.children[0]?.textContent === '— menunggu —') c.innerHTML = '';
+  const d = document.createElement('div');
+  d.className = 'log-line ' + cls;
+  d.textContent = msg;
+  c.appendChild(d);
+  if (c.children.length > 8) c.removeChild(c.children[0]);
+}
+
+function setCard(id, state) {
+  const el = document.getElementById('card-' + id);
+  el.className = 'stage-card ' + (state === 'active' ? 'active' : state === 'done' ? 'done' : state === 'warn' ? 'warn' : '');
+  const dot = document.getElementById('dot-' + id);
+  dot.className = 'dot ' + (state === 'active' ? 'dot-active' : state === 'done' ? 'dot-done' : 'dot-idle');
+}
+
+function setTask(id, state, msg) {
+  const el = document.getElementById('task-' + id);
+  const st = document.getElementById('task-' + id + '-status');
+  if (state === 'running') {
+    el.style.borderColor = '#38bdf8';
+    el.style.background = 'color-mix(in srgb, #38bdf8 5%, var(--color-background-primary))';
+    st.style.color = '#38bdf8'; st.textContent = msg || 'running...';
+  } else if (state === 'done') {
+    el.style.borderColor = '#22c55e';
+    el.style.background = 'color-mix(in srgb, #22c55e 5%, var(--color-background-primary))';
+    st.style.color = '#22c55e'; st.textContent = msg || 'selesai';
+  } else {
+    el.style.borderColor = 'var(--color-border-tertiary)';
+    el.style.background = 'var(--color-background-primary)';
+    st.style.color = 'var(--color-text-tertiary)'; st.textContent = 'idle';
+  }
+}
+
+function setBadge(txt, cls) {
+  const b = document.getElementById('status-badge');
+  b.className = 'badge ' + cls;
+  b.innerHTML = '<span class="dot ' + (cls === 'badge-blue' ? 'dot-active' : cls === 'badge-green' ? 'dot-done' : 'dot-idle') + '"></span> ' + txt;
+}
+
+function runDemo() {
+  if (running) return;
+  running = true;
+  resetVisuals();
+
+  setBadge('memproses...', 'badge-blue');
+
+  t(() => {
+    setCard('classifier', 'active');
+    log('> classify_request_type(question)', 'info');
+  }, 200);
+
+  t(() => {
+    log('  → data_task (complex)', 'success');
+    setCard('classifier', 'done');
+    setCard('planner', 'active');
+    log('> Planner Agent: membuat rencana...', 'info');
+  }, 900);
+
+  t(() => {
+    log('  phase 0: [muat dataset]');
+    log('  phase 1: [statistik, distribusi, outlier]');
+    setCard('planner', 'done');
+    setCard('executor', 'active');
+    log('> Executor: phase 0 dimulai', 'info');
+  }, 1900);
+
+  t(() => {
+    log('  task 0/3: muat dataset... ', 'info');
+  }, 2400);
+
+  t(() => {
+    log('  selesai (0.4s)', 'success');
+    log('> Executor: phase 1 — paralel', 'info');
+    setTask('a', 'running');
+    setTask('b', 'running');
+    setTask('c', 'running');
+  }, 3100);
+
+  t(() => { setTask('a', 'done', 'selesai 1.2s'); log('  task statistik selesai', 'success'); }, 4300);
+  t(() => { setTask('b', 'done', 'selesai 1.5s'); log('  task distribusi selesai', 'success'); }, 4600);
+  t(() => { setTask('c', 'done', 'selesai 1.8s'); log('  task outlier selesai', 'success'); }, 4900);
+
+  t(() => {
+    setCard('executor', 'done');
+    setCard('critic', 'active');
+    log('> Critic Agent: evaluasi output...', 'info');
+  }, 5400);
+
+  t(() => {
+    log('  judgment: ok', 'success');
+    log('  feedback: analisis lengkap', 'success');
+    setCard('critic', 'done');
+    setBadge('selesai', 'badge-green');
+    running = false;
+  }, 6400);
+}
+
+function resetVisuals() {
+  ['classifier','planner','executor','critic'].forEach(id => setCard(id, ''));
+  ['a','b','c'].forEach(id => setTask(id, 'idle'));
+  document.getElementById('log-container').innerHTML = '<div class="log-line" style="color:var(--color-text-tertiary);">— menunggu —</div>';
+}
+
+function resetDemo() {
+  clearTimers();
+  running = false;
+  resetVisuals();
+  setBadge('menunggu input', 'badge-blue');
+}
+</script>

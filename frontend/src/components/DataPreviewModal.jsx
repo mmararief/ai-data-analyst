@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react'
 
-export default function DataPreviewModal({ filename, onClose }) {
+export default function DataPreviewModal({ projectId, filename, onClose }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     const token = localStorage.getItem('token')
-    fetch(`/datasets/preview/${encodeURIComponent(filename)}?rows=50`, {
+    fetch(`/datasets/${projectId}/preview/${encodeURIComponent(filename)}?rows=50`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
       .then((d) => { setData(d); setLoading(false) })
       .catch(() => { setError('Gagal memuat preview'); setLoading(false) })
-  }, [filename])
+  }, [projectId, filename])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-overlay)] backdrop-blur-sm p-4">

@@ -11,4 +11,5 @@ RUN pip install --no-cache-dir \
     scikit-learn xgboost lightgbm \
     statsmodels scipy seaborn \
     joblib imbalanced-learn \
-    streamlit plotly
+    streamlit plotly \
+    sqlalchemy pymysql sqlparse psycopg2-binary

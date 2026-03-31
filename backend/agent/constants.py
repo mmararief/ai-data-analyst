@@ -1,0 +1,33 @@
+"""Shared constants for agent routing and AutoML intents."""
+
+MODEL_BUILD_KEYWORDS = [
+    "buat model",
+    "bangun model",
+    "latih model",
+    "model machine learning",
+    "model prediksi",
+    "buatkan model",
+    "training model",
+    "train model",
+    "regresi",
+    "klasifikasi",
+    "prediksi",
+    "automl",
+    "machine learning",
+    "ml model",
+    "buat ml",
+    "train ml",
+    "deteksi fraud",
+    "deteksi anomali",
+    "prediksi harga",
+    "prediksi churn",
+    "clustering",
+    "cluster",
+    "segmentasi",
+    "segmentation",
+    "kmeans",
+    "k-means",
+    "unsupervised",
+    "pengelompokan",
+]
+

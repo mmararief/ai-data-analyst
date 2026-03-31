@@ -2,6 +2,7 @@ import io
 import json
 import time
 from pathlib import Path
+from posixpath import normpath
 
 import pandas as pd
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
@@ -28,11 +29,24 @@ def _validate_name(filename: str) -> None:
         raise HTTPException(400, "Nama file tidak valid")
 
 
-def _load_schema_index(user_id: str) -> dict:
-    if not object_exists(user_id, SCHEMA_FILENAME):
+def _normalize_relative_path(path_value: str) -> str:
+    """Normalize relative object path and block traversal."""
+    value = (path_value or "").replace("\\", "/").strip()
+    if not value:
+        return ""
+    normalized = normpath(value).replace("\\", "/").strip("/")
+    if normalized in {"", "."}:
+        return ""
+    if normalized.startswith("../") or normalized == ".." or "/../" in normalized:
+        raise HTTPException(400, "Path tidak valid")
+    return normalized
+
+
+def _load_schema_index(user_id: str, project_id: str) -> dict:
+    if not object_exists(user_id, SCHEMA_FILENAME, project_id=project_id):
         return {"datasets": [], "updated_at": None}
     try:
-        raw = get_object_bytes(user_id, SCHEMA_FILENAME)
+        raw = get_object_bytes(user_id, SCHEMA_FILENAME, project_id=project_id)
         parsed = json.loads(raw.decode("utf-8"))
         if isinstance(parsed, dict) and isinstance(parsed.get("datasets"), list):
             return parsed
@@ -41,7 +55,7 @@ def _load_schema_index(user_id: str) -> dict:
     return {"datasets": [], "updated_at": None}
 
 
-def _save_schema_index(user_id: str, payload: dict) -> None:
+def _save_schema_index(user_id: str, project_id: str, payload: dict) -> None:
     payload = {
         "datasets": payload.get("datasets", []),
         "updated_at": time.time(),
@@ -51,6 +65,7 @@ def _save_schema_index(user_id: str, payload: dict) -> None:
         SCHEMA_FILENAME,
         json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"),
         content_type="application/json",
+        project_id=project_id,
     )
 
 
@@ -82,25 +97,30 @@ def _infer_schema(filename: str, data: bytes) -> dict | None:
         return None
 
 
-def _upsert_schema_entry(user_id: str, schema: dict | None, filename: str) -> None:
-    index = _load_schema_index(user_id)
+def _upsert_schema_entry(user_id: str, project_id: str, schema: dict | None, filename: str) -> None:
+    index = _load_schema_index(user_id, project_id)
     datasets = [item for item in index.get("datasets", []) if item.get("file") != filename]
     if schema is not None:
         datasets.append(schema)
     index["datasets"] = sorted(datasets, key=lambda item: item.get("file", ""))
     if index["datasets"]:
-        _save_schema_index(user_id, index)
-    elif object_exists(user_id, SCHEMA_FILENAME):
-        remove_object(user_id, SCHEMA_FILENAME)
+        _save_schema_index(user_id, project_id, index)
+    elif object_exists(user_id, SCHEMA_FILENAME, project_id=project_id):
+        remove_object(user_id, SCHEMA_FILENAME, project_id=project_id)
 
 
-@router.get("/")
-def list_files(user: UserInDB = Depends(get_current_user)):
-    return {"files": list_user_objects(user.user_id)}
+@router.get("/{project_id}/")
+def list_files(project_id: str, path: str = "", user: UserInDB = Depends(get_current_user)):
+    rel_path = _normalize_relative_path(path)
+    return {
+        "path": rel_path,
+        "files": list_user_objects(user.user_id, rel_path, project_id=project_id),
+    }
 
 
-@router.post("/upload")
+@router.post("/{project_id}/upload")
 async def upload_file(
+    project_id: str,
     file: UploadFile = File(...),
     batch_total: int = Form(1),
     batch_index: int = Form(1),
@@ -115,13 +135,12 @@ async def upload_file(
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(400, f"Format tidak didukung: {ext}")
 
-    # Read with hard cap to prevent oversized uploads from exhausting memory.
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, f"Ukuran file melebihi batas {MAX_UPLOAD_MB} MB")
 
-    put_object_bytes(user.user_id, file.filename, data)
-    _upsert_schema_entry(user.user_id, _infer_schema(file.filename, data), file.filename)
+    put_object_bytes(user.user_id, file.filename, data, project_id=project_id)
+    _upsert_schema_entry(user.user_id, project_id, _infer_schema(file.filename, data), file.filename)
     return {
         "message": f"{file.filename} berhasil diupload",
         "filename": file.filename,
@@ -130,55 +149,58 @@ async def upload_file(
     }
 
 
-@router.delete("/")
-def delete_all_files(user: UserInDB = Depends(get_current_user)):
-    """Hapus semua file milik user."""
-    files = list_user_objects(user.user_id)
+@router.delete("/{project_id}/")
+def delete_all_files(project_id: str, user: UserInDB = Depends(get_current_user)):
+    """Hapus semua file milik user dalam project."""
+    files = list_user_objects(user.user_id, project_id=project_id)
     for f in files:
         name = f["name"]
-        if prefix_has_objects(user.user_id, name):
-            remove_prefix(user.user_id, name)
-        elif object_exists(user.user_id, name):
-            remove_object(user.user_id, name)
-    if object_exists(user.user_id, SCHEMA_FILENAME):
-        remove_object(user.user_id, SCHEMA_FILENAME)
+        if prefix_has_objects(user.user_id, name, project_id=project_id):
+            remove_prefix(user.user_id, name, project_id=project_id)
+        elif object_exists(user.user_id, name, project_id=project_id):
+            remove_object(user.user_id, name, project_id=project_id)
+    if object_exists(user.user_id, SCHEMA_FILENAME, project_id=project_id):
+        remove_object(user.user_id, SCHEMA_FILENAME, project_id=project_id)
     return {"message": f"{len(files)} file berhasil dihapus"}
 
 
-@router.delete("/{filename}")
-def delete_file(filename: str, user: UserInDB = Depends(get_current_user)):
-    _validate_name(filename)
-    if prefix_has_objects(user.user_id, filename):
-        remove_prefix(user.user_id, filename)
-    elif object_exists(user.user_id, filename):
-        remove_object(user.user_id, filename)
+@router.delete("/{project_id}/{filename:path}")
+def delete_file(project_id: str, filename: str, user: UserInDB = Depends(get_current_user)):
+    rel_path = _normalize_relative_path(filename)
+    if not rel_path:
+        raise HTTPException(400, "Nama file tidak valid")
+    if prefix_has_objects(user.user_id, rel_path, project_id=project_id):
+        remove_prefix(user.user_id, rel_path, project_id=project_id)
+    elif object_exists(user.user_id, rel_path, project_id=project_id):
+        remove_object(user.user_id, rel_path, project_id=project_id)
     else:
         raise HTTPException(404, "File tidak ditemukan")
-    _upsert_schema_entry(user.user_id, None, filename)
-    return {"message": f"{filename} berhasil dihapus"}
+    _upsert_schema_entry(user.user_id, project_id, None, rel_path)
+    return {"message": f"{rel_path} berhasil dihapus"}
 
 
-@router.get("/download/{filename}")
-def download_file(filename: str, user: UserInDB = Depends(get_current_user)):
-    _validate_name(filename)
-    if not object_exists(user.user_id, filename):
+@router.get("/{project_id}/download/{filename:path}")
+def download_file(project_id: str, filename: str, user: UserInDB = Depends(get_current_user)):
+    rel_path = _normalize_relative_path(filename)
+    if not rel_path or not object_exists(user.user_id, rel_path, project_id=project_id):
         raise HTTPException(404, "File tidak ditemukan")
-    data = get_object_bytes(user.user_id, filename)
+    data = get_object_bytes(user.user_id, rel_path, project_id=project_id)
+    dl_name = Path(rel_path).name
     return StreamingResponse(
         io.BytesIO(data),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="{dl_name}"'},
     )
 
 
-@router.get("/preview/{filename}")
-def preview_file(filename: str, rows: int = 30, user: UserInDB = Depends(get_current_user)):
-    _validate_name(filename)
-    if not object_exists(user.user_id, filename):
+@router.get("/{project_id}/preview/{filename:path}")
+def preview_file(project_id: str, filename: str, rows: int = 30, user: UserInDB = Depends(get_current_user)):
+    rel_path = _normalize_relative_path(filename)
+    if not rel_path or not object_exists(user.user_id, rel_path, project_id=project_id):
         raise HTTPException(404, "File tidak ditemukan")
-    ext = Path(filename).suffix.lower()
+    ext = Path(rel_path).suffix.lower()
     try:
-        data = get_object_bytes(user.user_id, filename)
+        data = get_object_bytes(user.user_id, rel_path, project_id=project_id)
         buf = io.BytesIO(data)
         if ext == ".csv":
             df = pd.read_csv(buf, nrows=rows)
@@ -194,7 +216,7 @@ def preview_file(filename: str, rows: int = 30, user: UserInDB = Depends(get_cur
             "columns": df.columns.tolist(),
             "data": df.fillna("").astype(str).values.tolist(),
             "total_rows": len(df),
-            "filename": filename,
+            "filename": rel_path,
         }
     except HTTPException:
         raise

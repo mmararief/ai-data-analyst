@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analisai — Data Analyst AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root {
+  --bg: #03050f;
+  --bg2: #060916;
+  --bg3: #0a0e1a;
+  --surface: rgba(255,255,255,0.03);
+  --surface2: rgba(255,255,255,0.06);
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(56,189,248,0.2);
+  --cyan: #38bdf8;
+  --cyan2: #0ea5e9;
+  --cyan-dim: rgba(56,189,248,0.12);
+  --text: #e2e8f0;
+  --text2: #64748b;
+  --text3: #94a3b8;
+  --mono: 'JetBrains Mono', monospace;
+  --display: 'Syne', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--display);
+  overflow-x: hidden;
+  cursor: none;
+}
+
+/* ── Custom cursor ── */
+#cursor {
+  width: 8px; height: 8px;
+  background: var(--cyan);
+  border-radius: 50%;
+  position: fixed; top: 0; left: 0;
+  pointer-events: none; z-index: 9999;
+  transform: translate(-50%,-50%);
+  transition: transform 0.1s, width 0.2s, height 0.2s, background 0.2s;
+  box-shadow: 0 0 12px var(--cyan);
+}
+#cursor-ring {
+  width: 32px; height: 32px;
+  border: 1px solid rgba(56,189,248,0.4);
+  border-radius: 50%;
+  position: fixed; top: 0; left: 0;
+  pointer-events: none; z-index: 9998;
+  transform: translate(-50%,-50%);
+  transition: transform 0.18s ease, width 0.3s, height 0.3s, opacity 0.3s;
+}
+body:has(a:hover) #cursor, body:has(button:hover) #cursor {
+  width: 12px; height: 12px;
+}
+
+/* ── Canvas bg ── */
+#bg-canvas {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0;
+  opacity: 0.6;
+}
+
+/* ── Noise overlay ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Scanlines ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none; z-index: 1;
+}
+
+/* ── Typography ── */
+.display { font-family: var(--display); }
+.mono { font-family: var(--mono); }
+
+/* ── Layout ── */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+
+/* ── NAV ── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0;
+  z-index: 100;
+  padding: 1.25rem 2rem;
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(to bottom, rgba(3,5,15,0.9), transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  animation: fadeDown 0.8s ease both;
+}
+@keyframes fadeDown { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
+
+.nav-logo {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em;
+  color: #f0f9ff;
+}
+.nav-logo-dot {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--cyan), #6366f1);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; color: white;
+  box-shadow: 0 0 20px rgba(56,189,248,0.3);
+}
+.nav-links {
+  display: flex; gap: 2rem; list-style: none;
+  font-size: 0.85rem; font-weight: 500; color: var(--text2);
+}
+.nav-links a {
+  color: inherit; text-decoration: none;
+  transition: color 0.2s; letter-spacing: 0.04em;
+}
+.nav-links a:hover { color: var(--text3); }
+.nav-cta {
+  display: flex; gap: 0.75rem; align-items: center;
+}
+.btn-ghost {
+  background: none; border: none; cursor: none;
+  font-family: var(--display); font-size: 0.85rem; font-weight: 500;
+  color: var(--text2); padding: 0.5rem 1rem;
+  transition: color 0.2s;
+}
+.btn-ghost:hover { color: var(--text); }
+.btn-primary {
+  background: var(--cyan2);
+  border: none; cursor: none;
+  font-family: var(--display); font-size: 0.85rem; font-weight: 600;
+  color: #fff; padding: 0.55rem 1.25rem;
+  border-radius: 8px;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+  box-shadow: 0 0 20px rgba(14,165,233,0.25);
+}
+.btn-primary:hover {
+  background: var(--cyan);
+  box-shadow: 0 0 32px rgba(56,189,248,0.4);
+  transform: translateY(-1px);
+}
+
+/* ── HERO ── */
+#hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  position: relative; z-index: 2;
+  padding: 8rem 2rem 4rem;
+  text-align: center;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  font-family: var(--mono); font-size: 0.7rem; font-weight: 500;
+  letter-spacing: 0.12em; color: var(--cyan);
+  padding: 0.4rem 1rem; border-radius: 100px;
+  background: var(--cyan-dim);
+  border: 1px solid rgba(56,189,248,0.25);
+  margin-bottom: 2rem;
+  animation: fadeUp 0.8s 0.2s ease both;
+}
+.hero-badge-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:0.5;transform:scale(0.7)}
+}
+
+.hero-title {
+  font-size: clamp(3rem, 8vw, 6.5rem);
+  font-weight: 800;
+  line-height: 1.03;
+  letter-spacing: -0.03em;
+  color: #f8fafc;
+  margin-bottom: 1.5rem;
+  animation: fadeUp 0.9s 0.3s ease both;
+}
+.hero-title .accent {
+  position: relative;
+  background: linear-gradient(135deg, var(--cyan) 0%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-title .accent::after {
+  content: '';
+  position: absolute; bottom: -4px; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--cyan), #818cf8);
+  border-radius: 2px;
+  animation: lineGrow 1s 1.2s ease both;
+  transform-origin: left;
+  transform: scaleX(0);
+}
+@keyframes lineGrow { to{transform:scaleX(1)} }
+
+.hero-sub {
+  font-size: 1.1rem; line-height: 1.7;
+  color: var(--text2); max-width: 600px; margin: 0 auto 2.5rem;
+  font-weight: 400;
+  animation: fadeUp 0.9s 0.45s ease both;
+}
+
+.hero-cta {
+  display: flex; gap: 1rem; align-items: center; justify-content: center;
+  flex-wrap: wrap; margin-bottom: 4rem;
+  animation: fadeUp 0.9s 0.55s ease both;
+}
+.btn-hero-primary {
+  height: 52px; padding: 0 2rem;
+  background: linear-gradient(135deg, var(--cyan2), #6366f1);
+  border: none; border-radius: 10px; cursor: none;
+  font-family: var(--display); font-size: 0.95rem; font-weight: 700;
+  color: white; letter-spacing: 0.01em;
+  display: flex; align-items: center; gap: 0.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 0 40px rgba(14,165,233,0.3), 0 4px 20px rgba(0,0,0,0.4);
+  position: relative; overflow: hidden;
+}
+.btn-hero-primary::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+}
+.btn-hero-primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 60px rgba(56,189,248,0.4), 0 8px 30px rgba(0,0,0,0.5);
+}
+.btn-hero-secondary {
+  height: 52px; padding: 0 2rem;
+  background: var(--surface2);
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 10px; cursor: none;
+  font-family: var(--display); font-size: 0.95rem; font-weight: 600;
+  color: var(--text3); display: flex; align-items: center; gap: 0.5rem;
+  transition: border-color 0.2s, color 0.2s, transform 0.15s, background 0.2s;
+}
+.btn-hero-secondary:hover {
+  border-color: rgba(56,189,248,0.4);
+  color: #e0f2fe; background: rgba(56,189,248,0.06);
+  transform: translateY(-1px);
+}
+
+/* ── Pipeline viz ── */
+.pipeline-viz {
+  width: 100%; max-width: 900px;
+  animation: fadeUp 1s 0.7s ease both;
+}
+.pipeline-nodes {
+  display: flex; justify-content: space-between;
+  padding: 0 4rem; position: relative; z-index: 2;
+}
+.p-node {
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+}
+.p-node-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--cyan); font-size: 18px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 0 0 0 rgba(56,189,248,0);
+}
+.p-node:hover .p-node-icon {
+  transform: translateY(-4px);
+  box-shadow: 0 0 20px rgba(56,189,248,0.3);
+}
+.p-node-label {
+  font-family: var(--mono); font-size: 0.7rem;
+  color: var(--text2); letter-spacing: 0.08em;
+}
+
+.pipeline-svg-wrap {
+  position: relative; height: 120px; margin-top: -22px;
+}
+.pipeline-svg-wrap svg { width: 100%; height: 100%; }
+
+/* ── Stats strip ── */
+.stats-strip {
+  display: flex; justify-content: center; gap: 3rem;
+  margin-top: 2rem; flex-wrap: wrap;
+  animation: fadeUp 1s 0.9s ease both;
+}
+.stat-item {
+  text-align: center;
+  display: flex; flex-direction: column; gap: 0.2rem;
+}
+.stat-val {
+  font-size: 1.4rem; font-weight: 700; color: #f0f9ff;
+  letter-spacing: -0.02em;
+}
+.stat-val span { color: var(--cyan); }
+.stat-label {
+  font-family: var(--mono); font-size: 0.68rem;
+  color: var(--text2); letter-spacing: 0.1em; text-transform: uppercase;
+}
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Section headers ── */
+.section-tag {
+  font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.15em;
+  color: var(--cyan); text-transform: uppercase;
+  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;
+}
+.section-tag::before {
+  content: '';
+  width: 20px; height: 1px; background: var(--cyan);
+}
+.section-title {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 800; letter-spacing: -0.03em;
+  color: #f0f9ff; line-height: 1.1;
+  margin-bottom: 1.2rem;
+}
+.section-sub {
+  font-size: 1rem; color: var(--text2);
+  line-height: 1.7; max-width: 520px;
+}
+
+/* ── FEATURES ── */
+#features {
+  position: relative; z-index: 2;
+  padding: 8rem 2rem;
+}
+.features-header {
+  text-align: center; margin-bottom: 5rem;
+}
+.features-header .section-sub { margin: 0 auto; }
+.features-header .section-tag { justify-content: center; }
+.features-header .section-tag::before { display: none; }
+.features-header .section-tag::after {
+  content: ''; width: 20px; height: 1px; background: var(--cyan);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 16px; overflow: hidden;
+}
+.feature-card {
+  background: var(--bg2);
+  padding: 2.5rem 2rem;
+  position: relative; overflow: hidden;
+  transition: background 0.3s;
+}
+.feature-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.feature-card:hover { background: var(--bg3); }
+.feature-card:hover::before { opacity: 1; }
+
+.feature-card-glow {
+  position: absolute; top: -60px; right: -60px;
+  width: 200px; height: 200px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(56,189,248,0.06) 0%, transparent 70%);
+  pointer-events: none;
+  transition: opacity 0.3s;
+  opacity: 0;
+}
+.feature-card:hover .feature-card-glow { opacity: 1; }
+
+.feature-num {
+  font-family: var(--mono); font-size: 0.65rem;
+  color: var(--text2); letter-spacing: 0.15em;
+  margin-bottom: 1.5rem;
+}
+.feature-icon-wrap {
+  width: 48px; height: 48px;
+  background: var(--cyan-dim);
+  border: 1px solid rgba(56,189,248,0.2);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--cyan); font-size: 20px;
+  margin-bottom: 1.5rem;
+}
+.feature-title {
+  font-size: 1.1rem; font-weight: 700;
+  color: #f0f9ff; margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+.feature-desc {
+  font-size: 0.88rem; color: var(--text2);
+  line-height: 1.7;
+}
+
+/* ── HOW IT WORKS ── */
+#how {
+  position: relative; z-index: 2;
+  padding: 6rem 2rem 8rem;
+  background: linear-gradient(to bottom, transparent, var(--bg2) 20%, var(--bg2) 80%, transparent);
+}
+.how-inner {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6rem; align-items: center;
+}
+.how-steps { display: flex; flex-direction: column; gap: 0; }
+.how-step {
+  display: flex; gap: 1.5rem;
+  padding: 1.75rem 0;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+  transition: background 0.2s;
+  position: relative;
+}
+.how-step:last-child { border-bottom: none; }
+.how-step-num {
+  font-family: var(--mono); font-size: 0.7rem;
+  color: var(--text2); padding-top: 3px;
+  min-width: 28px; letter-spacing: 0.08em;
+}
+.how-step-body {}
+.how-step-title {
+  font-size: 1rem; font-weight: 700;
+  color: #e2e8f0; margin-bottom: 0.4rem;
+  letter-spacing: -0.01em;
+}
+.how-step-desc {
+  font-size: 0.85rem; color: var(--text2); line-height: 1.65;
+}
+.how-step:hover .how-step-title { color: var(--cyan); }
+
+/* Terminal mockup */
+.terminal {
+  background: #080c16;
+  border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden;
+  box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 0 1px var(--border);
+}
+.terminal-bar {
+  background: #0a0e1a;
+  padding: 0.85rem 1.25rem;
+  display: flex; align-items: center; gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+.t-dot { width: 11px; height: 11px; border-radius: 50%; }
+.t-title {
+  font-family: var(--mono); font-size: 0.7rem;
+  color: var(--text2); margin-left: 0.5rem; letter-spacing: 0.06em;
+}
+.terminal-body { padding: 1.5rem; font-family: var(--mono); font-size: 0.78rem; line-height: 1.9; }
+.t-comment { color: #475569; }
+.t-key { color: #38bdf8; }
+.t-val { color: #86efac; }
+.t-str { color: #fde68a; }
+.t-fn { color: #c084fc; }
+.t-op { color: #94a3b8; }
+.t-cursor {
+  display: inline-block; width: 8px; height: 14px;
+  background: var(--cyan); vertical-align: text-bottom;
+  animation: blink 1.2s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+.terminal-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+.t-tab {
+  padding: 0.6rem 1.25rem;
+  font-family: var(--mono); font-size: 0.7rem;
+  color: var(--text2); cursor: none; border: none;
+  background: none; transition: color 0.2s, background 0.2s;
+  letter-spacing: 0.06em; border-right: 1px solid var(--border);
+}
+.t-tab.active { color: var(--cyan); background: var(--cyan-dim); }
+
+/* ── MODELS LEADERBOARD ── */
+#models {
+  position: relative; z-index: 2;
+  padding: 8rem 2rem;
+}
+.models-inner {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 5rem; align-items: start;
+}
+.leaderboard {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px; overflow: hidden;
+}
+.lb-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.lb-title {
+  font-family: var(--mono); font-size: 0.7rem;
+  letter-spacing: 0.1em; color: var(--text2); text-transform: uppercase;
+}
+.lb-badge {
+  font-family: var(--mono); font-size: 0.65rem;
+  background: var(--cyan-dim); color: var(--cyan);
+  padding: 0.2rem 0.6rem; border-radius: 4px;
+  border: 1px solid rgba(56,189,248,0.2); letter-spacing: 0.08em;
+}
+.lb-row {
+  display: flex; align-items: center;
+  padding: 1rem 1.5rem; gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s;
+}
+.lb-row:last-child { border-bottom: none; }
+.lb-row:hover { background: var(--surface); }
+.lb-rank {
+  font-family: var(--mono); font-size: 0.7rem;
+  color: var(--text2); min-width: 20px;
+}
+.lb-rank.gold { color: #fbbf24; }
+.lb-name {
+  flex: 1; font-size: 0.88rem; font-weight: 600; color: #e2e8f0;
+}
+.lb-bar-wrap { flex: 1.5; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.lb-bar { height: 100%; border-radius: 2px; transition: width 1.5s ease; }
+.lb-score {
+  font-family: var(--mono); font-size: 0.78rem;
+  color: var(--text3); min-width: 42px; text-align: right;
+}
+
+/* ── ARCHITECTURE ── */
+#architecture {
+  position: relative; z-index: 2;
+  padding: 6rem 2rem 8rem;
+  background: linear-gradient(to bottom, transparent, var(--bg2) 30%, var(--bg2) 70%, transparent);
+}
+.arch-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: 14px;
+  overflow: hidden; margin-top: 4rem;
+}
+.arch-card {
+  background: var(--bg2); padding: 2rem 1.5rem;
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; gap: 1rem;
+}
+.arch-card::after {
+  content: attr(data-num);
+  position: absolute; top: 1rem; right: 1.25rem;
+  font-family: var(--mono); font-size: 0.62rem;
+  color: var(--border2); letter-spacing: 0.1em;
+}
+.arch-step-label {
+  font-family: var(--mono); font-size: 0.62rem;
+  color: var(--cyan); letter-spacing: 0.12em; text-transform: uppercase;
+}
+.arch-card-title {
+  font-size: 0.95rem; font-weight: 700; color: #e2e8f0;
+  letter-spacing: -0.01em;
+}
+.arch-card-desc {
+  font-size: 0.8rem; color: var(--text2); line-height: 1.65; flex: 1;
+}
+.arch-arrow {
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem 0;
+  background: var(--bg2); border-left: 1px solid var(--border);
+  color: var(--text2);
+}
+
+/* ── CTA ── */
+#cta {
+  position: relative; z-index: 2;
+  padding: 8rem 2rem;
+  text-align: center;
+}
+.cta-box {
+  max-width: 700px; margin: 0 auto;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 24px; padding: 5rem 4rem;
+  position: relative; overflow: hidden;
+}
+.cta-box::before {
+  content: '';
+  position: absolute; top: -120px; left: 50%;
+  transform: translateX(-50%);
+  width: 400px; height: 300px;
+  background: radial-gradient(ellipse, rgba(56,189,248,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cta-title {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 800; letter-spacing: -0.03em;
+  color: #f0f9ff; margin-bottom: 1.2rem;
+  line-height: 1.1;
+}
+.cta-sub {
+  color: var(--text2); font-size: 1rem;
+  line-height: 1.7; margin-bottom: 2.5rem;
+}
+
+/* ── FOOTER ── */
+footer {
+  position: relative; z-index: 2;
+  padding: 2rem;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 1rem;
+}
+.footer-left {
+  display: flex; align-items: center; gap: 0.75rem;
+  font-size: 0.85rem; color: var(--text2);
+}
+.footer-right {
+  font-family: var(--mono); font-size: 0.7rem;
+  color: var(--text2); letter-spacing: 0.06em;
+}
+
+/* ── Reveal animation ── */
+.reveal {
+  opacity: 0; transform: translateY(32px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* ── Divider ── */
+.divider {
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
+  position: relative; z-index: 2;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.2); border-radius: 2px; }
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  body { cursor: auto; }
+  #cursor, #cursor-ring { display: none; }
+  .features-grid { grid-template-columns: 1fr; }
+  .how-inner { grid-template-columns: 1fr; gap: 3rem; }
+  .models-inner { grid-template-columns: 1fr; gap: 3rem; }
+  .arch-grid { grid-template-columns: 1fr 1fr; }
+  .pipeline-nodes { padding: 0 1rem; }
+  nav .nav-links { display: none; }
+  .cta-box { padding: 3rem 1.5rem; }
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+<canvas id="bg-canvas"></canvas>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-dot">A</div>
+    Analisai
+  </div>
+  <ul class="nav-links">
+    <li><a href="#features">Fitur</a></li>
+    <li><a href="#how">Cara Kerja</a></li>
+    <li><a href="#models">Model</a></li>
+    <li><a href="#architecture">Arsitektur</a></li>
+  </ul>
+  <div class="nav-cta">
+    <button class="btn-ghost">Masuk</button>
+    <button class="btn-primary">Mulai Gratis</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-badge">
+    <span class="hero-badge-dot"></span>
+    POWERED BY LANGGRAPH · 3-AGENT PIPELINE
+  </div>
+
+  <h1 class="hero-title">
+    Data Analyst AI<br>
+    yang <span class="accent">memukau</span>
+  </h1>
+
+  <p class="hero-sub">
+    Eksplorasi, visualisasi, hingga machine learning. Cukup gunakan bahasa natural — biarkan AI menyusun rencana dan mengeksekusi kode Python secara otomatis.
+  </p>
+
+  <div class="hero-cta">
+    <button class="btn-hero-primary">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      Mulai Analisis
+    </button>
+    <button class="btn-hero-secondary">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Lihat Demo
+    </button>
+  </div>
+
+  <!-- Pipeline nodes -->
+  <div class="pipeline-viz">
+    <div class="pipeline-nodes">
+      <div class="p-node">
+        <div class="p-node-icon">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        </div>
+        <span class="p-node-label">upload</span>
+      </div>
+      <div class="p-node">
+        <div class="p-node-icon">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        </div>
+        <span class="p-node-label">analisis</span>
+      </div>
+      <div class="p-node">
+        <div class="p-node-icon">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+        </div>
+        <span class="p-node-label">visualisasi</span>
+      </div>
+      <div class="p-node">
+        <div class="p-node-icon">
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        </div>
+        <span class="p-node-label">prediksi</span>
+      </div>
+    </div>
+
+    <div class="pipeline-svg-wrap">
+      <svg viewBox="0 0 900 120" preserveAspectRatio="none" id="branch-svg">
+        <defs>
+          <linearGradient id="lg1" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8"/>
+            <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+          </linearGradient>
+          <filter id="glow-f">
+            <feGaussianBlur stdDeviation="3" result="b"/>
+            <feComposite in="SourceGraphic" in2="b" operator="over"/>
+          </filter>
+        </defs>
+        <!-- Glow paths -->
+        <g stroke="url(#lg1)" stroke-width="3" fill="none" filter="url(#glow-f)" opacity="0.6" id="glow-paths">
+          <path class="bp" d="M112 0 C112 60 450 40 450 120"/>
+          <path class="bp" d="M300 0 C300 60 450 40 450 120"/>
+          <path class="bp" d="M600 0 C600 60 450 40 450 120"/>
+          <path class="bp" d="M788 0 C788 60 450 40 450 120"/>
+        </g>
+        <!-- Sharp paths -->
+        <g stroke="url(#lg1)" stroke-width="1" fill="none" id="sharp-paths">
+          <path class="bp" d="M112 0 C112 60 450 40 450 120"/>
+          <path class="bp" d="M300 0 C300 60 450 40 450 120"/>
+          <path class="bp" d="M600 0 C600 60 450 40 450 120"/>
+          <path class="bp" d="M788 0 C788 60 450 40 450 120"/>
+        </g>
+        <!-- Convergence dot -->
+        <circle id="conv-dot" cx="450" cy="118" r="0" fill="#38bdf8" fill-opacity="0.9"/>
+        <circle id="conv-ring" cx="450" cy="118" r="0" fill="none" stroke="#38bdf8" stroke-width="1" stroke-opacity="0.3"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="stats-strip">
+    <div class="stat-item">
+      <div class="stat-val"><span>5</span> model</div>
+      <div class="stat-label">candidates</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val">Auto <span>HP</span></div>
+      <div class="stat-label">tuning</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val"><span>3</span>-agent</div>
+      <div class="stat-label">pipeline</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-val">Docker <span>✓</span></div>
+      <div class="stat-label">isolated sandbox</div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="features-header reveal">
+      <div class="section-tag">Fitur Unggulan</div>
+      <h2 class="section-title">Perangkat lengkap<br>untuk tim data</h2>
+      <p class="section-sub">Dari eksplorasi data hingga deployment model — semua dalam satu pipeline terintegrasi.</p>
+    </div>
+
+    <div class="features-grid reveal">
+      <div class="feature-card">
+        <div class="feature-card-glow"></div>
+        <div class="feature-num">01 ——</div>
+        <div class="feature-icon-wrap">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        </div>
+        <div class="feature-title">Planner + Executor Agent</div>
+        <div class="feature-desc">Pipeline 3-agent berbasis LangGraph: Planner menyusun rencana, Executor menjalankan kode paralel per fase, Critic mengevaluasi hasil secara otomatis.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card-glow"></div>
+        <div class="feature-num">02 ——</div>
+        <div class="feature-icon-wrap">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        </div>
+        <div class="feature-title">Sandbox Docker Terisolasi</div>
+        <div class="feature-desc">Seluruh eksekusi kode Python berjalan dalam container Docker offline. Data Anda tidak pernah meninggalkan environment terisolasi.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card-glow"></div>
+        <div class="feature-num">03 ——</div>
+        <div class="feature-icon-wrap">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        </div>
+        <div class="feature-title">AutoML Terstruktur</div>
+        <div class="feature-desc">5 model candidates (RF, GBM, XGB, LGBM, Linear) dengan cross-validation, hyperparameter tuning otomatis, dan leaderboard performa.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card-glow"></div>
+        <div class="feature-num">04 ——</div>
+        <div class="feature-icon-wrap">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </div>
+        <div class="feature-title">Streaming Job Tangguh</div>
+        <div class="feature-desc">Proses AI berjalan di background via Redis queue. Refresh halaman kapanpun — progres tidak hilang. Event streaming real-time ke frontend.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card-glow"></div>
+        <div class="feature-num">05 ——</div>
+        <div class="feature-icon-wrap">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm12 0a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/></svg>
+        </div>
+        <div class="feature-title">Dashboard Streamlit Otomatis</div>
+        <div class="feature-desc">AI menghasilkan aplikasi web Streamlit interaktif secara otomatis dari instruksi teks. Berjalan di container terpisah tanpa konfigurasi manual.</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-card-glow"></div>
+        <div class="feature-num">06 ——</div>
+        <div class="feature-icon-wrap">
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        </div>
+        <div class="feature-title">Multi-format & MinIO Storage</div>
+        <div class="feature-desc">Dukungan CSV, Excel, JSON, Parquet, Pickle. File disimpan di MinIO object storage — aman, persisten, dan dapat diakses lintas sesi.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="container">
+    <div class="how-inner">
+      <div class="reveal">
+        <div class="section-tag">Cara Kerja</div>
+        <h2 class="section-title">Dari teks ke insight<br>dalam detik</h2>
+        <p class="section-sub" style="margin-bottom:2.5rem">Pipeline otomatis yang mengubah pertanyaan bahasa natural menjadi analisis data yang komprehensif.</p>
+
+        <div class="how-steps">
+          <div class="how-step">
+            <span class="how-step-num">01.</span>
+            <div class="how-step-body">
+              <div class="how-step-title">Unggah & Tanya</div>
+              <div class="how-step-desc">Upload file data (CSV/Excel/JSON) dan ketik pertanyaan dalam bahasa Indonesia. Tidak perlu syntax SQL atau kode apapun.</div>
+            </div>
+          </div>
+          <div class="how-step">
+            <span class="how-step-num">02.</span>
+            <div class="how-step-body">
+              <div class="how-step-title">Planner Agent Menyusun Rencana</div>
+              <div class="how-step-desc">LLM planner menganalisis pertanyaan dan membuat JSON task plan dengan fase paralel — seperti sprint planning tapi dalam milidetik.</div>
+            </div>
+          </div>
+          <div class="how-step">
+            <span class="how-step-num">03.</span>
+            <div class="how-step-body">
+              <div class="how-step-title">Executor Menjalankan Kode</div>
+              <div class="how-step-desc">Kode Python dieksekusi secara paralel per fase di sandbox Docker terisolasi. Grafik, model, dan output dikirim real-time ke browser Anda.</div>
+            </div>
+          </div>
+          <div class="how-step">
+            <span class="how-step-num">04.</span>
+            <div class="how-step-body">
+              <div class="how-step-title">Critic Agent Mengevaluasi</div>
+              <div class="how-step-desc">Critic memeriksa kelengkapan hasil. Jika kurang, ia membuat additional tasks untuk refinement otomatis — tanpa intervensi manual.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Terminal mockup -->
+      <div class="reveal">
+        <div class="terminal">
+          <div class="terminal-bar">
+            <div class="t-dot" style="background:#ff5f57"></div>
+            <div class="t-dot" style="background:#febc2e"></div>
+            <div class="t-dot" style="background:#28c840"></div>
+            <span class="t-title">analisai · pipeline · live</span>
+          </div>
+          <div class="terminal-tabs">
+            <button class="t-tab active">planner</button>
+            <button class="t-tab">executor</button>
+            <button class="t-tab">critic</button>
+          </div>
+          <div class="terminal-body">
+            <div><span class="t-comment"># pertanyaan pengguna</span></div>
+            <div><span class="t-key">question</span> <span class="t-op">=</span> <span class="t-str">"prediksi churn pada customers.csv"</span></div>
+            <div>&nbsp;</div>
+            <div><span class="t-comment"># planner agent</span></div>
+            <div><span class="t-fn">plan</span> <span class="t-op">=</span> <span class="t-op">[</span></div>
+            <div>&nbsp; <span class="t-op">{</span><span class="t-key">"task"</span><span class="t-op">:</span> <span class="t-str">"profiling dataset"</span><span class="t-op">,</span> <span class="t-key">"phase"</span><span class="t-op">:</span> <span class="t-val">0</span><span class="t-op">},</span></div>
+            <div>&nbsp; <span class="t-op">{</span><span class="t-key">"task"</span><span class="t-op">:</span> <span class="t-str">"cleaning & feature eng."</span><span class="t-op">,</span> <span class="t-key">"phase"</span><span class="t-op">:</span> <span class="t-val">1</span><span class="t-op">},</span></div>
+            <div>&nbsp; <span class="t-op">{</span><span class="t-key">"task"</span><span class="t-op">:</span> <span class="t-str">"train automl classification"</span><span class="t-op">,</span> <span class="t-key">"phase"</span><span class="t-op">:</span> <span class="t-val">2</span><span class="t-op">},</span></div>
+            <div><span class="t-op">]</span></div>
+            <div>&nbsp;</div>
+            <div><span class="t-comment"># executor output</span></div>
+            <div><span class="t-key">best_model</span> <span class="t-op">=</span> <span class="t-str">"LightGBM"</span></div>
+            <div><span class="t-key">accuracy</span>  <span class="t-op">=</span> <span class="t-val">0.934</span></div>
+            <div><span class="t-key">f1_score</span>  <span class="t-op">=</span> <span class="t-val">0.921</span></div>
+            <div>&nbsp;</div>
+            <div><span class="t-comment"># critic judgment</span></div>
+            <div><span class="t-key">judgment</span> <span class="t-op">=</span> <span class="t-val">"ok"</span> <span class="t-comment">✓ analisis lengkap</span></div>
+            <div><span class="t-cursor"></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- MODELS -->
+<section id="models">
+  <div class="container">
+    <div class="models-inner">
+      <div class="reveal">
+        <div class="section-tag">AutoML Engine</div>
+        <h2 class="section-title">5 model,<br>1 terbaik otomatis</h2>
+        <p class="section-sub" style="margin-bottom:2rem">AutoML pipeline melatih semua kandidat model secara paralel, melakukan cross-validation, lalu memilih yang terbaik dengan hyperparameter tuning.</p>
+
+        <div style="display:flex;flex-direction:column;gap:0.75rem;margin-top:2rem">
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
+            <div style="width:8px;height:8px;border-radius:50%;background:#38bdf8;box-shadow:0 0 8px #38bdf8;flex-shrink:0"></div>
+            <span style="font-size:0.82rem;color:var(--text2)">Cleaning otomatis: duplikat, missing values, outlier clipping</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
+            <div style="width:8px;height:8px;border-radius:50%;background:#38bdf8;box-shadow:0 0 8px #38bdf8;flex-shrink:0"></div>
+            <span style="font-size:0.82rem;color:var(--text2)">Feature engineering: datetime extraction, skewness transform, high-cardinality encoding</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
+            <div style="width:8px;height:8px;border-radius:50%;background:#38bdf8;box-shadow:0 0 8px #38bdf8;flex-shrink:0"></div>
+            <span style="font-size:0.82rem;color:var(--text2)">Cross-validation + RandomizedSearchCV hyperparameter tuning otomatis</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal">
+        <div class="leaderboard">
+          <div class="lb-header">
+            <span class="lb-title">Model Leaderboard</span>
+            <span class="lb-badge">classification</span>
+          </div>
+          <div class="lb-row">
+            <span class="lb-rank gold">01</span>
+            <span class="lb-name">LightGBM</span>
+            <div class="lb-bar-wrap"><div class="lb-bar" data-w="93" style="width:0%;background:linear-gradient(90deg,#38bdf8,#6366f1)"></div></div>
+            <span class="lb-score">0.934</span>
+          </div>
+          <div class="lb-row">
+            <span class="lb-rank">02</span>
+            <span class="lb-name">XGBoost</span>
+            <div class="lb-bar-wrap"><div class="lb-bar" data-w="89" style="width:0%;background:linear-gradient(90deg,#38bdf8,#6366f1)"></div></div>
+            <span class="lb-score">0.891</span>
+          </div>
+          <div class="lb-row">
+            <span class="lb-rank">03</span>
+            <span class="lb-name">GradientBoosting</span>
+            <div class="lb-bar-wrap"><div class="lb-bar" data-w="86" style="width:0%;background:linear-gradient(90deg,#38bdf8,#6366f1)"></div></div>
+            <span class="lb-score">0.862</span>
+          </div>
+          <div class="lb-row">
+            <span class="lb-rank">04</span>
+            <span class="lb-name">RandomForest</span>
+            <div class="lb-bar-wrap"><div class="lb-bar" data-w="81" style="width:0%;background:linear-gradient(90deg,#38bdf8,#6366f1)"></div></div>
+            <span class="lb-score">0.814</span>
+          </div>
+          <div class="lb-row">
+            <span class="lb-rank">05</span>
+            <span class="lb-name">LogisticRegression</span>
+            <div class="lb-bar-wrap"><div class="lb-bar" data-w="73" style="width:0%;background:linear-gradient(90deg,#475569,#64748b)"></div></div>
+            <span class="lb-score">0.731</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="container">
+    <div class="reveal" style="text-align:center;margin-bottom:1rem">
+      <div class="section-tag" style="justify-content:center"><span style="width:20px;height:1px;background:var(--cyan);display:block"></span>Arsitektur</div>
+      <h2 class="section-title">Pipeline yang<br>dirancang untuk skala</h2>
+      <p class="section-sub" style="margin:0 auto">Setiap komponen terisolasi, scalable, dan dapat dikonfigurasi secara independen.</p>
+    </div>
+
+    <div class="arch-grid reveal">
+      <div class="arch-card" data-num="01">
+        <div class="arch-step-label">input layer</div>
+        <div class="arch-card-title">Classifier & Router</div>
+        <div class="arch-card-desc">Lightweight LLM classifier menentukan routing: smalltalk, model_build, simple task, atau full 3-agent pipeline.</div>
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:auto">
+          <span style="font-family:var(--mono);font-size:0.62rem;color:var(--cyan);background:var(--cyan-dim);padding:0.2rem 0.5rem;border-radius:3px">classifier.py</span>
+        </div>
+      </div>
+      <div class="arch-card" data-num="02">
+        <div class="arch-step-label">planning layer</div>
+        <div class="arch-card-title">Planner Agent</div>
+        <div class="arch-card-desc">MODEL_PLANNER menghasilkan JSON task plan dengan fase paralel. Fallback otomatis jika LLM gagal — pipeline tidak pernah stuck.</div>
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:auto">
+          <span style="font-family:var(--mono);font-size:0.62rem;color:var(--cyan);background:var(--cyan-dim);padding:0.2rem 0.5rem;border-radius:3px">pipeline.py</span>
+        </div>
+      </div>
+      <div class="arch-card" data-num="03">
+        <div class="arch-step-label">execution layer</div>
+        <div class="arch-card-title">Executor + Sandbox</div>
+        <div class="arch-card-desc">Tasks dijalankan paralel per fase via threading. Python sandbox Docker terisolasi dengan timeout 300s per task.</div>
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:auto">
+          <span style="font-family:var(--mono);font-size:0.62rem;color:var(--cyan);background:var(--cyan-dim);padding:0.2rem 0.5rem;border-radius:3px">executor.py</span>
+          <span style="font-family:var(--mono);font-size:0.62rem;color:var(--cyan);background:var(--cyan-dim);padding:0.2rem 0.5rem;border-radius:3px">sandbox.py</span>
+        </div>
+      </div>
+      <div class="arch-card" data-num="04">
+        <div class="arch-step-label">evaluation layer</div>
+        <div class="arch-card-title">Critic Agent</div>
+        <div class="arch-card-desc">Evaluasi output dengan threshold metrik. Jika performa rendah, Critic menghasilkan additional tasks untuk refinement otomatis.</div>
+        <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:auto">
+          <span style="font-family:var(--mono);font-size:0.62rem;color:var(--cyan);background:var(--cyan-dim);padding:0.2rem 0.5rem;border-radius:3px">critic.py</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Infra strip -->
+    <div class="reveal" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-top:1.5px">
+      <div style="background:var(--bg3);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.75rem">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text2)">infra</div>
+        <div style="font-family:var(--mono);font-size:0.72rem;font-weight:500;color:var(--text3)">Redis · MinIO · Docker · FastAPI</div>
+      </div>
+      <div style="background:var(--bg3);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.75rem">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text2)">ml</div>
+        <div style="font-family:var(--mono);font-size:0.72rem;font-weight:500;color:var(--text3)">XGBoost · LightGBM · sklearn</div>
+      </div>
+      <div style="background:var(--bg3);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.75rem">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text2)">ai</div>
+        <div style="font-family:var(--mono);font-size:0.72rem;font-weight:500;color:var(--text3)">LangGraph · LangChain · Gemini</div>
+      </div>
+      <div style="background:var(--bg3);padding:1.25rem 1.5rem;display:flex;align-items:center;gap:0.75rem">
+        <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text2)">viz</div>
+        <div style="font-family:var(--mono);font-size:0.72rem;font-weight:500;color:var(--text3)">Streamlit · matplotlib · Plotly</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- CTA -->
+<section id="cta">
+  <div class="container">
+    <div class="cta-box reveal">
+      <h2 class="cta-title">Siap menganalisis<br>data Anda?</h2>
+      <p class="cta-sub">Upload file data pertama Anda dan lihat bagaimana AI Agent memecah masalah kompleks menjadi insight yang actionable dalam hitungan detik.</p>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+        <button class="btn-hero-primary">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          Mulai Sekarang — Gratis
+        </button>
+        <button class="btn-hero-secondary">Lihat Dokumentasi</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-left">
+    <div class="nav-logo-dot" style="width:22px;height:22px;font-size:11px">A</div>
+    <span>Analisai Platform</span>
+    <span style="color:var(--border)">·</span>
+    <span>Dibuat oleh Muhammad Ammar Arief</span>
+  </div>
+  <div class="footer-right">© 2025 · ALL RIGHTS RESERVED</div>
+</footer>
+
+<script>
+// ── Cursor ──────────────────────────────────────────────────────────────────
+const cursor = document.getElementById('cursor')
+const ring = document.getElementById('cursor-ring')
+let mx = 0, my = 0, rx = 0, ry = 0
+
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY
+  cursor.style.left = mx + 'px'
+  cursor.style.top = my + 'px'
+})
+
+function animRing() {
+  rx += (mx - rx) * 0.12
+  ry += (my - ry) * 0.12
+  ring.style.left = rx + 'px'
+  ring.style.top = ry + 'px'
+  requestAnimationFrame(animRing)
+}
+animRing()
+
+// ── Canvas background — particle field + grid ────────────────────────────────
+const canvas = document.getElementById('bg-canvas')
+const ctx = canvas.getContext('2d')
+let W, H, particles = [], gridLines = []
+
+function resizeCanvas() {
+  W = canvas.width = window.innerWidth
+  H = canvas.height = window.innerHeight
+}
+resizeCanvas()
+window.addEventListener('resize', resizeCanvas)
+
+// Init particles
+for (let i = 0; i < 60; i++) {
+  particles.push({
+    x: Math.random() * W, y: Math.random() * H,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: (Math.random() - 0.5) * 0.3,
+    r: Math.random() * 1.5 + 0.3,
+    a: Math.random() * 0.4 + 0.05,
+  })
+}
+
+function drawCanvas() {
+  ctx.clearRect(0, 0, W, H)
+
+  // Grid
+  ctx.strokeStyle = 'rgba(56,189,248,0.04)'
+  ctx.lineWidth = 0.5
+  const gs = 80
+  for (let x = 0; x < W; x += gs) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+  }
+  for (let y = 0; y < H; y += gs) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+  }
+
+  // Particles + connections
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy
+    if (p.x < 0) p.x = W; if (p.x > W) p.x = 0
+    if (p.y < 0) p.y = H; if (p.y > H) p.y = 0
+
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(56,189,248,${p.a})`
+    ctx.fill()
+  })
+
+  // Connections
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x
+      const dy = particles[i].y - particles[j].y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist < 120) {
+        ctx.beginPath()
+        ctx.moveTo(particles[i].x, particles[i].y)
+        ctx.lineTo(particles[j].x, particles[j].y)
+        ctx.strokeStyle = `rgba(56,189,248,${0.06 * (1 - dist / 120)})`
+        ctx.lineWidth = 0.5
+        ctx.stroke()
+      }
+    }
+  }
+
+  requestAnimationFrame(drawCanvas)
+}
+drawCanvas()
+
+// ── Branch SVG animation ──────────────────────────────────────────────────────
+const bpaths = document.querySelectorAll('.bp')
+bpaths.forEach((p, i) => {
+  const len = p.getTotalLength ? p.getTotalLength() : 200
+  p.style.strokeDasharray = len
+  p.style.strokeDashoffset = len
+  setTimeout(() => {
+    p.style.transition = `stroke-dashoffset 1.4s ${0.5 + i * 0.12}s ease`
+    p.style.strokeDashoffset = 0
+  }, 100)
+})
+
+// Convergence dot
+setTimeout(() => {
+  const dot = document.getElementById('conv-dot')
+  const rng = document.getElementById('conv-ring')
+  dot.style.transition = 'r 0.4s cubic-bezier(0.34,1.56,0.64,1)'
+  dot.setAttribute('r', '5')
+  setTimeout(() => {
+    rng.style.transition = 'r 0.6s ease, stroke-opacity 0.6s ease'
+    rng.setAttribute('r', '14')
+    rng.setAttribute('stroke-opacity', '0.2')
+  }, 200)
+}, 1900)
+
+// ── Scroll reveal ────────────────────────────────────────────────────────────
+const revealEls = document.querySelectorAll('.reveal')
+const ro = new IntersectionObserver(entries => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      e.target.style.transitionDelay = (i % 3) * 0.1 + 's'
+      e.target.classList.add('visible')
+    }
+  })
+}, { threshold: 0.1, rootMargin: '-60px' })
+revealEls.forEach(el => ro.observe(el))
+
+// ── Leaderboard bars ─────────────────────────────────────────────────────────
+const lbRo = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      document.querySelectorAll('.lb-bar').forEach(bar => {
+        const w = bar.dataset.w
+        bar.style.transition = 'width 1.2s ease'
+        bar.style.width = w + '%'
+      })
+      lbRo.disconnect()
+    }
+  })
+}, { threshold: 0.3 })
+const lb = document.querySelector('.leaderboard')
+if (lb) lbRo.observe(lb)
+
+// ── Terminal tabs ─────────────────────────────────────────────────────────────
+const tabs = document.querySelectorAll('.t-tab')
+const tabContents = {
+  planner: [
+    ['comment', '# pertanyaan pengguna'],
+    ['key', 'question'], ['op', ' = '], ['str', '"prediksi churn pada customers.csv"'],
+    ['', '&nbsp;'],
+    ['comment', '# planner agent'],
+    ['fn', 'plan'], ['op', ' = ['],
+    ['', '&nbsp; '], ['op', '{'], ['key', '"task"'], ['op', ': '], ['str', '"profiling dataset"'], ['op', ', '], ['key', '"phase"'], ['op', ': '], ['val', '0'], ['op', '},'],
+    ['', '&nbsp; '], ['op', '{'], ['key', '"task"'], ['op', ': '], ['str', '"train automl"'], ['op', ', '], ['key', '"phase"'], ['op', ': '], ['val', '1'], ['op', '},'],
+    ['op', ']'],
+  ],
+  executor: [
+    ['comment', '# executor running phase 1'],
+    ['key', 'tasks'], ['op', ' = '], ['fn', 'run_phase_parallel'], ['op', '(generators)'],
+    ['', '&nbsp;'],
+    ['comment', '# tool calls'],
+    ['fn', 'automl_train_tool'], ['op', '('],
+    ['', '&nbsp; '], ['key', 'dataset_name'], ['op', '='], ['str', '"customers.csv"'], ['op', ','],
+    ['', '&nbsp; '], ['key', 'target_column'], ['op', '='], ['str', '"churn"'], ['op', ','],
+    ['', '&nbsp; '], ['key', 'problem_type'], ['op', '='], ['str', '"classification"'],
+    ['op', ')'],
+    ['', '&nbsp;'],
+    ['key', 'best_model'], ['op', ' = '], ['val', '"LightGBM"'],
+    ['key', 'accuracy'], ['op', '  = '], ['val', '0.934'],
+  ],
+  critic: [
+    ['comment', '# critic agent evaluation'],
+    ['fn', 'judgment'], ['op', ' = '], ['fn', 'run_critic_agent'],['op', '('],
+    ['', '&nbsp; '], ['key', 'question'], ['op', ','], ['key', 'execution_output'],
+    ['op', ')'],
+    ['', '&nbsp;'],
+    ['comment', '# result'],
+    ['key', 'judgment'], ['op', ' = '], ['val', '"ok"'],
+    ['key', 'feedback'], ['op', ' = '], ['str', '"analisis sudah lengkap"'],
+    ['key', 'additional_tasks'], ['op', ' = '], ['op', '[]'],
+    ['', '&nbsp;'],
+    ['comment', '# pipeline selesai ✓'],
+  ]
+}
+
+function renderTerminal(key) {
+  const body = document.querySelector('.terminal-body')
+  const lines = tabContents[key]
+  body.innerHTML = lines.map(([type, text]) => {
+    if (!type) return `<div>${text}</div>`
+    return `<div><span class="t-${type}">${text}</span></div>`
+  }).join('') + '<div><span class="t-cursor"></span></div>'
+}
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('active'))
+    tab.classList.add('active')
+    renderTerminal(tab.textContent.trim())
+  })
+})
+
+// ── Parallax on scroll ───────────────────────────────────────────────────────
+let ticking = false
+window.addEventListener('scroll', () => {
+  if (!ticking) {
+    requestAnimationFrame(() => {
+      const sy = window.scrollY
+      const heroContent = document.querySelector('#hero .pipeline-viz')
+      if (heroContent) {
+        heroContent.style.transform = `translateY(${sy * 0.15}px)`
+        heroContent.style.opacity = Math.max(0, 1 - sy / 400)
+      }
+      ticking = false
+    })
+    ticking = true
+  }
+})
+</script>
+</body>
+</html>

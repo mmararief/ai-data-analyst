@@ -1,10 +1,10 @@
 """
 Redis store untuk chat history & sessions.
 
-Schema:
-  sess:{user_id}:{session_id}   → Redis Hash
+Schema (project-scoped):
+  sess:{user_id}:{project_id}:{session_id}   → Redis Hash
       fields: title, created_at, updated_at, messages_json
-  sessidx:{user_id}             → Redis Sorted Set
+  sessidx:{user_id}:{project_id}             → Redis Sorted Set
       member=session_id, score=updated_at_timestamp (float, detik)
 """
 import json
@@ -20,12 +20,12 @@ except ImportError:
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
 
 
-def _sess_key(user_id: str, session_id: str) -> str:
-    return f"sess:{user_id}:{session_id}"
+def _sess_key(user_id: str, project_id: str, session_id: str) -> str:
+    return f"sess:{user_id}:{project_id}:{session_id}"
 
 
-def _idx_key(user_id: str) -> str:
-    return f"sessidx:{user_id}"
+def _idx_key(user_id: str, project_id: str) -> str:
+    return f"sessidx:{user_id}:{project_id}"
 
 
 def _now_iso() -> str:
@@ -41,16 +41,14 @@ def _iso_to_score(iso: str) -> float:
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
-def list_sessions(user_id: str) -> list[dict]:
-    """Return list of session summaries for user, newest first."""
-    idx_key = _idx_key(user_id)
-    # Sorted set: ZREVRANGE returns highest score (newest) first
+def list_sessions(user_id: str, *, project_id: str) -> list[dict]:
+    """Return list of session summaries for a project, newest first."""
+    idx_key = _idx_key(user_id, project_id)
     session_ids = redis_client.zrevrange(idx_key, 0, -1)
     sessions = []
     for sid in session_ids:
-        data = redis_client.hgetall(_sess_key(user_id, sid))
+        data = redis_client.hgetall(_sess_key(user_id, project_id, sid))
         if not data:
-            # Dangling index entry — clean up
             redis_client.zrem(idx_key, sid)
             continue
         messages = json.loads(data.get("messages_json", "[]"))
@@ -64,9 +62,9 @@ def list_sessions(user_id: str) -> list[dict]:
     return sessions
 
 
-def get_session(user_id: str, session_id: str) -> dict | None:
+def get_session(user_id: str, project_id: str, session_id: str) -> dict | None:
     """Return full session dict or None if not found."""
-    data = redis_client.hgetall(_sess_key(user_id, session_id))
+    data = redis_client.hgetall(_sess_key(user_id, project_id, session_id))
     if not data:
         return None
     return {
@@ -77,9 +75,16 @@ def get_session(user_id: str, session_id: str) -> dict | None:
     }
 
 
-def save_session(user_id: str, session_id: str, title: str, messages: list) -> str:
+def save_session(
+    user_id: str,
+    session_id: str,
+    title: str,
+    messages: list,
+    *,
+    project_id: str,
+) -> str:
     """Create or update a session. Returns session_id."""
-    sess_key = _sess_key(user_id, session_id)
+    sess_key = _sess_key(user_id, project_id, session_id)
     existing = redis_client.hget(sess_key, "created_at")
     now = _now_iso()
 
@@ -89,15 +94,29 @@ def save_session(user_id: str, session_id: str, title: str, messages: list) -> s
         "created_at": existing or now,
         "updated_at": now,
     })
-    redis_client.zadd(_idx_key(user_id), {session_id: _iso_to_score(now)})
+    redis_client.zadd(_idx_key(user_id, project_id), {session_id: _iso_to_score(now)})
     return session_id
 
 
-def delete_session(user_id: str, session_id: str) -> bool:
+def delete_session(user_id: str, project_id: str, session_id: str) -> bool:
     """Delete session. Returns True if it existed, False otherwise."""
-    sess_key = _sess_key(user_id, session_id)
+    sess_key = _sess_key(user_id, project_id, session_id)
     existed = redis_client.exists(sess_key)
     if existed:
         redis_client.delete(sess_key)
-        redis_client.zrem(_idx_key(user_id), session_id)
+        redis_client.zrem(_idx_key(user_id, project_id), session_id)
     return bool(existed)
+
+
+def delete_sessions_for_project(user_id: str, project_id: str) -> int:
+    """Delete all sessions for a project. Returns count deleted."""
+    idx_key = _idx_key(user_id, project_id)
+    session_ids = redis_client.zrange(idx_key, 0, -1)
+    count = 0
+    for sid in session_ids:
+        sess_key = _sess_key(user_id, project_id, sid)
+        if redis_client.exists(sess_key):
+            redis_client.delete(sess_key)
+            count += 1
+    redis_client.delete(idx_key)
+    return count
