@@ -43,7 +43,7 @@ function TypingIndicator() {
   )
 }
 
-export default function MessageBubble({ message, isLoading, statusText, allMessages, projectId }) {
+export default function MessageBubble({ message, isLoading, statusText, allMessages, projectId, isLastMessage, onApprovePlan, onSelectOption, onSubmitClarification }) {
   const isUser = message.role === 'user'
   const isEmpty = !message.parts?.length && !message.codeSteps?.length
   const [nbLoading, setNbLoading] = useState(false)
@@ -71,45 +71,66 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
     const nonInsightParts = parts.filter(p => p.type !== 'insight')
     const insightPart = parts.find(p => p.type === 'insight')
 
-    if (steps.length === 0) {
-      const ordered = nonInsightParts.map(p => ({ type: 'part', value: p }))
-      if (insightPart) ordered.push({ type: 'part', value: insightPart })
-      return { ordered, parts, steps: [] }
-    }
+    // Check if parts array has any 'code_step' (new format)
+    const hasCodeStepRefs = nonInsightParts.some(p => p.type === 'code_step')
 
     const ordered = []
-    let stepIdx = 0
-    let textCountSinceTask = 0
 
-    const groupSteps = () => {
-      const currentGroup = []
-      while (stepIdx < steps.length) {
-        currentGroup.push(steps[stepIdx])
-        stepIdx++
-      }
-      if (currentGroup.length > 0) {
-        ordered.push({ type: 'steps', value: currentGroup })
-      }
-    }
-
-    for (const part of nonInsightParts) {
-      ordered.push({ type: 'part', value: part })
-
-      if (part.type === 'task_start') {
-        textCountSinceTask = 0
-      } else if (part.type === 'text') {
-        textCountSinceTask++
-        // If we have text after a task, and haven't rendered steps yet,
-        // we might want to wait. But usually steps come after a task_start or initial text.
-        // Let's just group them all at the end of the message content for simplicity
-        // or after the first text part.
-        if (textCountSinceTask === 1 && stepIdx < steps.length) {
-          groupSteps()
+    if (hasCodeStepRefs) {
+      // New logic: interleave exactly as they were pushed
+      let currentStepsGroup = []
+      for (const part of nonInsightParts) {
+        if (part.type === 'code_step') {
+          if (steps[part.stepIndex]) {
+            currentStepsGroup.push(steps[part.stepIndex])
+          }
+        } else {
+          if (currentStepsGroup.length > 0) {
+            ordered.push({ type: 'steps', value: currentStepsGroup })
+            currentStepsGroup = []
+          }
+          ordered.push({ type: 'part', value: part })
         }
       }
-    }
+      if (currentStepsGroup.length > 0) {
+        ordered.push({ type: 'steps', value: currentStepsGroup })
+      }
+    } else {
+      // Legacy logic for backward compatibility
+      if (steps.length === 0) {
+        const legacyOrdered = nonInsightParts.map(p => ({ type: 'part', value: p }))
+        if (insightPart) legacyOrdered.push({ type: 'part', value: insightPart })
+        return { ordered: legacyOrdered, parts, steps: [] }
+      }
 
-    groupSteps()
+      let stepIdx = 0
+      let textCountSinceTask = 0
+
+      const groupSteps = () => {
+        const currentGroup = []
+        while (stepIdx < steps.length) {
+          currentGroup.push(steps[stepIdx])
+          stepIdx++
+        }
+        if (currentGroup.length > 0) {
+          ordered.push({ type: 'steps', value: currentGroup })
+        }
+      }
+
+      for (const part of nonInsightParts) {
+        ordered.push({ type: 'part', value: part })
+
+        if (part.type === 'task_start') {
+          textCountSinceTask = 0
+        } else if (part.type === 'text') {
+          textCountSinceTask++
+          if (textCountSinceTask === 1 && stepIdx < steps.length) {
+            groupSteps()
+          }
+        }
+      }
+      groupSteps()
+    }
 
     if (insightPart) ordered.push({ type: 'part', value: insightPart })
     return { ordered, parts, steps }
@@ -145,7 +166,19 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
                 <>
                   {ordered.map((item, i) =>
                     item.type === 'part' ? (
-                      <PartRenderer key={i} part={item.value} index={i} openInsights={openInsights} toggleInsight={toggleInsight} isLoading={isLoading} projectId={projectId} />
+                      <PartRenderer 
+                        key={i} 
+                        part={item.value} 
+                        index={i} 
+                        openInsights={openInsights} 
+                        toggleInsight={toggleInsight} 
+                        isLoading={isLoading} 
+                        projectId={projectId} 
+                        isLastMessage={isLastMessage}
+                        onApprovePlan={onApprovePlan}
+                        onSelectOption={onSelectOption}
+                        onSubmitClarification={onSubmitClarification}
+                      />
                     ) : (
                       <ToolCallGroup
                         key={i}

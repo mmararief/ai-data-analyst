@@ -14,7 +14,6 @@ from sandbox import run_ai_code_securely
 
 IMAGE_RE = re.compile(r"\[\[IMAGE_START\]\](.*?)\[\[IMAGE_END\]\]", re.DOTALL)
 CHART_RE = re.compile(r"\[\[CHART_FILE\]\](.*?)\[\[/CHART_FILE\]\]", re.DOTALL)
-STREAMLIT_RE = re.compile(r"\[\[STREAMLIT_APP\]\](.*?)\[\[/STREAMLIT_APP\]\]", re.DOTALL)
 REACT_TRACE_RE = re.compile(
     r"^(Thought|Action\s*Input|Action|Observation)\s*:\s*.*$(\n|$)",
     re.MULTILINE | re.IGNORECASE,
@@ -261,7 +260,7 @@ def run_training_with_progress(train_fn, timeout_seconds: int = 600):
     """Run a training function in a background thread, yielding progress events.
 
     ``train_fn`` receives a single ``progress_callback`` keyword argument.
-    Progress events are ``{"type": "automl_progress", "content": msg}``.
+    Progress events are ``{"type": "progress", "content": msg}``.
     The **last** yielded item is a :class:`TrainingResult` wrapping the return
     value of *train_fn*.  Raises if *train_fn* raised.
     """
@@ -293,7 +292,7 @@ def run_training_with_progress(train_fn, timeout_seconds: int = 600):
             continue
         if msg is None:
             break
-        yield {"type": "automl_progress", "content": msg}
+        yield {"type": "progress", "content": msg}
 
     t.join()
 
@@ -309,12 +308,7 @@ def run_structured_code_step(data_folder: Path, code: str):
 
     yield from extract_chart_images(raw_output, data_folder)
 
-    for sl_match in STREAMLIT_RE.finditer(raw_output):
-        sl_filename = Path(sl_match.group(1).strip()).name
-        if sl_filename and sl_filename.endswith('.py') and '..' not in sl_filename:
-            yield {"type": "streamlit", "content": sl_filename}
-
-    clean_output = CHART_RE.sub("", IMAGE_RE.sub("", STREAMLIT_RE.sub("", raw_output))).strip()
+    clean_output = CHART_RE.sub("", IMAGE_RE.sub("", raw_output)).strip()
     if clean_output:
         yield {"type": "output", "content": clean_output}
 

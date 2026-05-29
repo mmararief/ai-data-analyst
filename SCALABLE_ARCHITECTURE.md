@@ -42,15 +42,17 @@ docker-compose up -d mysql redis minio
 Buat file `.env` di root project:
 
 ```env
-GOOGLE_API_KEY=your_gemini_api_key_here
+SUMOPOD_API_KEY=your_sumopod_api_key_here
+SUMOPOD_BASE_URL=https://ai.sumopod.com/v1
 SECRET_KEY=your-secret-key-change-in-production
 MYSQL_URL=mysql+pymysql://analyst:analyst_password@localhost:3306/ai_analyst
 REDIS_URL=redis://localhost:6379/0
 MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin123
-MODEL_CHAT=gemini-3.1-flash-lite-preview
-MODEL_DEEP=gemini-3.1-pro-preview
+AI_PROVIDER=sumopod
+MODEL_CHAT=gpt-4o-mini
+MODEL_DEEP=gpt-4o
 ```
 
 ### 4. Install Dependencies

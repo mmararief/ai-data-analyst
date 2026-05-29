@@ -18,7 +18,7 @@ from backend.core.config import MAX_UPLOAD_MB, MAX_UPLOAD_FILES
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
-ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".json", ".parquet", ".pkl", ".joblib"}
+ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".json", ".parquet", ".pkl"}
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 SCHEMA_FILENAME = "_schema.json"
 

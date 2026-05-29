@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
-from backend.agent.llm import build_llm, invoke_with_retry
+from backend.agent.llm import build_llm, invoke_with_retry, stream_with_retry
 from backend.agent.prompts import (
     CHART_RULE,
     CONTEXT_RULE,
     OUTPUT_DISCIPLINE_RULE,
-    DIRECT_LLM_PROMPT,
+    build_direct_llm_prompt,
 )
 from backend.agent.utils import (
     answer_simple_task_from_schema,
@@ -17,7 +17,7 @@ from backend.agent.utils import (
 )
 
 
-def run_direct_llm(question: str, history: list | None = None, model: str = None):
+def run_direct_llm(question: str, history: list | None = None, model: str = None, file_list: str = "- (belum ada file)"):
     """Single lightweight LLM reply without planner/executor/insight orchestration."""
     from backend.core.config import MODEL_CHAT, MAX_HISTORY_MESSAGES, MAX_HISTORY_CONTENT_LEN
 
@@ -32,15 +32,15 @@ def run_direct_llm(question: str, history: list | None = None, model: str = None
         # Trim ulang agar tidak terlalu panjang untuk smalltalk
         history_text = trim_content(history_text, MAX_HISTORY_CONTENT_LEN * MAX_HISTORY_MESSAGES)
 
-    system = DIRECT_LLM_PROMPT
+    system = build_direct_llm_prompt(file_list)
     human = f"Pesan pengguna: {question}\n\n{history_text}" if history_text else f"Pesan pengguna: {question}"
 
     try:
         llm = build_llm(model=model_name, temperature=0.4, max_output_tokens=512)
-        response = invoke_with_retry(llm, [("system", system), ("human", human)])
-        text = response.content if isinstance(response.content, str) else extract_text(response.content)
-        if text:
-            yield {"type": "text", "content": text}
+        for chunk in stream_with_retry(llm, [("system", system), ("human", human)]):
+            token = chunk.content if isinstance(chunk.content, str) else ""
+            if token:
+                yield {"type": "text", "content": token}
     except Exception as exc:
         yield {"type": "error", "content": str(exc)}
     yield {"type": "done"}

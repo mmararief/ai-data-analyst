@@ -1,6 +1,6 @@
 # 🤖 AI Data Analyst
 
-Platform analisis data berbasis AI yang menggunakan multi-agent orchestration untuk exploratory data analysis (EDA), preprocessing, machine learning, dan visualisasi data secara otomatis.
+Platform analisis data berbasis AI yang menggunakan multi-agent orchestration untuk exploratory data analysis (EDA), preprocessing, dan visualisasi data secara otomatis.
 
 ## ✨ Fitur Utama
 
@@ -68,7 +68,7 @@ Platform analisis data berbasis AI yang menggunakan multi-agent orchestration un
 - Docker & Docker Compose
 - Node.js 18+ (untuk development frontend)
 - Python 3.10+ (untuk development backend)
-- Google Gemini API Key ([Get here](https://makersuite.google.com/app/apikey))
+- SumoPod API Key
 
 ### 1. Clone Repository
 
@@ -82,8 +82,9 @@ cd ai-data-analyst
 Buat file `.env` di root project:
 
 ```env
-# Google Gemini API
-GOOGLE_API_KEY=your_gemini_api_key_here
+# SumoPod API
+SUMOPOD_API_KEY=your_sumopod_api_key_here
+SUMOPOD_BASE_URL=https://ai.sumopod.com/v1
 
 # Security
 SECRET_KEY=your-super-secret-key-change-in-production
@@ -105,8 +106,9 @@ MINIO_SECRET_KEY=minioadmin123
 MINIO_BUCKET=ai-datasets
 
 # AI Models
-MODEL_CHAT=gemini-1.5-flash-8b
-MODEL_DEEP=gemini-1.5-pro
+AI_PROVIDER=sumopod
+MODEL_CHAT=gpt-4o-mini
+MODEL_DEEP=gpt-4o
 
 # Sandbox Limits
 SANDBOX_TIMEOUT=120
@@ -266,7 +268,7 @@ docker-compose logs -f
 - **FastAPI** - Modern async web framework
 - **LangChain** - AI agent orchestration framework
 - **LangGraph** - Multi-agent workflow management
-- **Google Gemini** - Large Language Models (Flash & Pro)
+- **SumoPod** - Large Language Models
 - **Redis** - Job queue & event streaming
 - **MySQL** - User authentication database
 - **MinIO** - S3-compatible object storage
@@ -284,7 +286,6 @@ docker-compose logs -f
 
 - **pandas** - Data manipulation
 - **numpy** - Numerical computing
-- **scikit-learn** - Machine learning
 - **matplotlib** - Plotting
 - **seaborn** - Statistical visualization
 - **plotly** - Interactive charts
@@ -389,7 +390,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🙏 Acknowledgments
 
-- Google Gemini API for powerful language models
+- SumoPod API for powerful language models
 - LangChain & LangGraph teams for agent frameworks
 - FastAPI for excellent async Python framework
 - Open source community for amazing libraries

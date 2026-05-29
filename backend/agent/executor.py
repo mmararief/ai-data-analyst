@@ -15,11 +15,10 @@ from backend.agent.utils import (
     IMAGE_RE,
     INTERNAL_PATH_RE,
     REACT_TRACE_RE,
-    STREAMLIT_RE,
     extract_text,
 )
 
-TASK_TIMEOUT_SECONDS = 300
+TASK_TIMEOUT_SECONDS = 480  # 8 menit — cukup untuk model lokal (Ollama) yang lambat
 
 
 def execute_task(
@@ -52,8 +51,18 @@ def execute_task(
 
     def _run(ag=exec_agent, aq=task_agent_q, t=task):
         try:
-            for chunk in ag.stream({"messages": [("human", t)]}, {"recursion_limit": 40}):
-                aq.put(("chunk", chunk))
+            for stream_mode, chunk in ag.stream(
+                {"messages": [("human", t)]}, 
+                {"recursion_limit": 40},
+                stream_mode=["messages", "updates"]
+            ):
+                if stream_mode == "messages":
+                    msg_chunk, metadata = chunk
+                    if metadata.get("langgraph_node") == "agent":
+                        if isinstance(msg_chunk.content, str) and msg_chunk.content:
+                            aq.put(("token", msg_chunk.content))
+                elif stream_mode == "updates":
+                    aq.put(("chunk", chunk))
             aq.put(("done", None))
         except Exception as exc:
             aq.put(("error", f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}"))
@@ -61,7 +70,6 @@ def execute_task(
     threading.Thread(target=_run, daemon=True).start()
 
     task_output_parts: list[str] = []
-    automl_active = False
     deadline = time.monotonic() + TASK_TIMEOUT_SECONDS
 
     while True:
@@ -71,10 +79,7 @@ def execute_task(
 
         while not task_progress_q.empty():
             msg = task_progress_q.get_nowait()
-            if automl_active:
-                yield {"type": "automl_progress", "content": msg}
-            else:
-                yield {"type": "progress", "content": msg}
+            yield {"type": "progress", "content": msg}
 
         try:
             kind, data = task_agent_q.get(timeout=0.05)
@@ -84,59 +89,54 @@ def execute_task(
         if kind == "done":
             while not task_progress_q.empty():
                 msg = task_progress_q.get_nowait()
-                if automl_active:
-                    yield {"type": "automl_progress", "content": msg}
-                else:
-                    yield {"type": "progress", "content": msg}
+                yield {"type": "progress", "content": msg}
             break
         if kind == "error":
-            automl_active = False
             yield {"type": "error", "content": f"Task {task_index + 1} error: {data}"}
             break
+
+        if kind == "token":
+            yield {"type": "text", "content": data}
+            continue
 
         chunk = data
         if "agent" in chunk:
             msg = chunk["agent"]["messages"][0]
             text = extract_text(msg.content)
-            if text:
-                for sl_match in STREAMLIT_RE.finditer(text):
-                    sl_filename = Path(sl_match.group(1).strip()).name
-                    if sl_filename and sl_filename.endswith('.py') and '..' not in sl_filename:
-                        yield {"type": "streamlit", "content": sl_filename}
-                text = CHART_RE.sub("", STREAMLIT_RE.sub("", IMAGE_RE.sub("", text))).strip()
-                text = REACT_TRACE_RE.sub("", text).strip()
-                text = CHART_PATH_RE.sub("", text).strip()
-                text = INTERNAL_PATH_RE.sub("", text).strip()
-                if text:
-                    task_output_parts.append(text)
-                    yield {"type": "text", "content": text}
             if hasattr(msg, "tool_calls") and msg.tool_calls:
                 for tc in msg.tool_calls:
                     if tc.get("name") == "python_repl_tool":
-                        # Code snippet dikirim sekali; output berikutnya tetap via progress/output
                         code_str = tc["args"].get("code", "")
                         if code_str:
-                            yield {"type": "code", "content": code_str}
-                        # Saat tool baru dimulai, reset state AutoML agar tidak bocor
-                        automl_active = False
-                    elif tc.get("name") == "automl_train_tool":
-                        ds = tc["args"].get("dataset_name", "dataset")
-                        tgt = tc["args"].get("target_column", "target")
-                        pt = tc["args"].get("problem_type", "auto")
-                        automl_active = True
-                        yield {
-                            "type": "automl_train_start",
-                            "dataset": ds,
-                            "target": tgt,
-                            "problem_type": pt,
-                        }
-                    elif tc.get("name") == "web_search_tool":
-                        query = tc["args"].get("query", "")
-                        yield {"type": "web_search", "query": query}
+                            yield {"type": "code", "content": code_str, "tool": "python_repl_tool"}
+                            yield {"type": "text", "content": "\n"}
+                    elif tc.get("name") == "read_data_tool":
+                        fname = tc["args"].get("filename", "")
+                        n_rows = tc["args"].get("n_rows", 5)
+                        yield {"type": "code", "content": f"read_data_tool('{fname}', n_rows={n_rows})", "tool": "read_data_tool"}
                     elif tc.get("name") == "file_export_tool":
                         fname = tc["args"].get("filename", "")
                         fmt = tc["args"].get("format", "")
                         yield {"type": "file_export_start", "filename": fname, "format": fmt}
+                    elif tc.get("name") == "data_profile_tool":
+                        fname = tc["args"].get("filename", "")
+                        yield {"type": "code", "content": f"data_profile_tool('{fname}')", "tool": "data_profile_tool"}
+                    elif tc.get("name") == "render_chart_tool":
+                        chart_code = tc["args"].get("code", "")
+                        chart_fname = tc["args"].get("filename", "chart.png")
+                        if chart_code:
+                            yield {"type": "code", "content": chart_code, "tool": "render_chart_tool", "filename": chart_fname}
+                            yield {"type": "text", "content": "\n"}
+                        yield {"type": "chart_start", "filename": chart_fname}
+
+                if text:
+                    text_clean = CHART_RE.sub("", IMAGE_RE.sub("", text)).strip()
+                    text_clean = REACT_TRACE_RE.sub("", text_clean).strip()
+                    text_clean = CHART_PATH_RE.sub("", text_clean).strip()
+                    text_clean = INTERNAL_PATH_RE.sub("", text_clean).strip()
+                    if text_clean:
+                        task_output_parts.append(text_clean)
+                    # Output teks SUDAH di-stream lewat 'token', tidak perlu yield ulang
 
         elif "tools" in chunk:
             tool_output = chunk["tools"]["messages"][0].content
@@ -178,39 +178,60 @@ def execute_task(
                             pass
                         known_charts.add(new_chart.name)
 
-            for sl_match in STREAMLIT_RE.finditer(tool_output):
-                sl_filename = Path(sl_match.group(1).strip()).name
-                if sl_filename and sl_filename.endswith('.py') and '..' not in sl_filename:
-                    yield {"type": "streamlit", "content": sl_filename}
-
-            clean_output = CHART_RE.sub("", IMAGE_RE.sub("", STREAMLIT_RE.sub("", tool_output))).strip()
+            clean_output = CHART_RE.sub("", IMAGE_RE.sub("", tool_output)).strip()
             clean_output = CHART_PATH_RE.sub("", clean_output).strip()
             if clean_output:
-                if automl_active and clean_output.startswith('{"type": "automl_train"'):
-                    try:
-                        automl_data = json.loads(clean_output)
-                        automl_active = False
-                        yield {"type": "automl_train_done", **automl_data}
-                    except Exception:
-                        automl_active = False
-                        task_output_parts.append(clean_output)
-                        yield {"type": "output", "content": clean_output}
-                elif clean_output.startswith("AUTO_ML_ERROR:"):
-                    automl_active = False
-                    yield {"type": "error", "content": clean_output}
-                elif clean_output.startswith('{"type": "web_search"'):
-                    try:
-                        ws_data = json.loads(clean_output)
-                        yield {"type": "web_search_result", **ws_data}
-                        task_output_parts.append(clean_output)
-                    except Exception:
-                        task_output_parts.append(clean_output)
-                        yield {"type": "output", "content": clean_output}
-                elif clean_output.startswith('{"type": "file_export"'):
+                if clean_output.startswith('{"type": "file_export"'):
                     try:
                         fe_data = json.loads(clean_output)
                         yield {"type": "file_export_done", **fe_data}
                         task_output_parts.append(clean_output)
+                    except Exception:
+                        task_output_parts.append(clean_output)
+                        yield {"type": "output", "content": clean_output}
+                elif clean_output.startswith('{"type": "chart"'):
+                    try:
+                        chart_data = json.loads(clean_output)
+                        chart_fname = chart_data.get("filename", "")
+                        chart_error = chart_data.get("error", "")
+
+                        if chart_fname and not chart_error:
+                            local_chart = data_folder / chart_fname
+                            # Retry for Docker volume sync
+                            import os as _os
+                            for _retry in range(30):
+                                try:
+                                    # Force refresh directory cache on Windows
+                                    _os.listdir(str(data_folder))
+                                except Exception:
+                                    pass
+                                if local_chart.exists() and local_chart.stat().st_size > 0:
+                                    break
+                                time.sleep(0.5)
+                            if local_chart.exists() and local_chart.stat().st_size > 0:
+                                with open(local_chart, "rb") as _cf:
+                                    img_b64 = base64.b64encode(_cf.read()).decode()
+                                try:
+                                    local_chart.unlink()
+                                except Exception:
+                                    pass
+                                yield {"type": "image", "content": img_b64, "filename": chart_fname}
+                                task_output_parts.append(f"[chart: {chart_fname}]")
+
+                        # ── Error path: tool reported an error ──
+                        elif chart_error:
+                            yield {"type": "error", "content": f"Chart error: {chart_error[:300]}"}
+                    except Exception:
+                        task_output_parts.append(clean_output)
+                        yield {"type": "output", "content": clean_output}
+                elif clean_output.startswith('{"status":'):
+                    # Structured output from python_repl_tool
+                    try:
+                        repl_data = json.loads(clean_output)
+                        inner = repl_data.get("output", "")
+                        if inner:
+                            task_output_parts.append(inner)
+                            yield {"type": "output", "content": inner}
                     except Exception:
                         task_output_parts.append(clean_output)
                         yield {"type": "output", "content": clean_output}
@@ -227,40 +248,60 @@ def execute_task(
 
 
 def run_phase_parallel(generators):
-    """Run multiple task generators in parallel, buffering per-task for clean sequential output."""
+    """Run multiple task generators in parallel, streaming events as they arrive.
+
+    For a single generator, events are streamed directly (no overhead).
+    For multiple generators, a shared queue collects events from all threads and
+    yields them in near real-time (50ms polling) — no more waiting for the
+    slowest task before showing anything to the user.
+    """
     if len(generators) == 1:
         yield from generators[0]
         return
 
-    buffers: list[list[dict]] = [[] for _ in generators]
-    finished = [False] * len(generators)
+    _DONE = object()  # sentinel to signal a thread finished
+    shared_q: queue.Queue = queue.Queue()
+    n_tasks = len(generators)
 
-    def _drain(gen, buf, idx):
+    def _drain(gen):
         try:
             for event in gen:
-                buf.append(event)
+                shared_q.put(event)
         except Exception as e:
-            buf.append({"type": "error", "content": str(e)})
+            shared_q.put({"type": "error", "content": str(e)})
         finally:
-            finished[idx] = True
+            shared_q.put(_DONE)
 
     threads = []
-    for i, gen in enumerate(generators):
-        t = threading.Thread(target=_drain, args=(gen, buffers[i], i), daemon=True)
+    for gen in generators:
+        t = threading.Thread(target=_drain, args=(gen,), daemon=True)
         t.start()
         threads.append(t)
 
-    # Join dengan timeout defensif; jika thread masih hidup setelah itu,
-    # tandai buffer-nya dengan error timeout dan lanjutkan.
-    for i, t in enumerate(threads):
-        t.join(timeout=TASK_TIMEOUT_SECONDS + 30)
-        if t.is_alive() and not finished[i]:
-            buffers[i].append({
-                "type": "error",
-                "content": f"Task {i + 1} timeout setelah {TASK_TIMEOUT_SECONDS + 30}s di fase parallel",
-            })
-            finished[i] = True
+    done_received = 0
+    deadline = time.monotonic() + TASK_TIMEOUT_SECONDS + 30
 
-    for buf in buffers:
-        for event in buf:
-            yield event
+    while done_received < n_tasks:
+        if time.monotonic() > deadline:
+            yield {
+                "type": "error",
+                "content": f"Parallel phase timeout setelah {TASK_TIMEOUT_SECONDS + 30}s",
+            }
+            break
+        try:
+            item = shared_q.get(timeout=0.05)
+        except queue.Empty:
+            continue
+        if item is _DONE:
+            done_received += 1
+        else:
+            yield item
+
+    # Drain any remaining items that arrived after the last sentinel
+    while not shared_q.empty():
+        try:
+            item = shared_q.get_nowait()
+            if item is not _DONE:
+                yield item
+        except queue.Empty:
+            break

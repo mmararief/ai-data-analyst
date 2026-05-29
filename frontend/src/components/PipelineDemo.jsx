@@ -300,19 +300,13 @@ const PipelineDemo = () => {
                 <div className="w-6 h-6 rounded flex items-center justify-center bg-purple-500/10 text-purple-400 border border-purple-500/20">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
                 </div>
-                automl_train_tool
+                data_profile_tool
             </div>
             <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
                 <div className="w-6 h-6 rounded flex items-center justify-center bg-teal-500/10 text-teal-400 border border-teal-500/20">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor"><path d="M3 4h10M3 8h10M3 12h5" strokeLinecap="round"/></svg>
                 </div>
-                automl_list_models_tool
-            </div>
-            <div className="flex items-center gap-2 text-[12px] text-[var(--text-secondary)]">
-                <div className="w-6 h-6 rounded flex items-center justify-center bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor"><path d="M2 8h3l2-5 3 10 2-5h2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-                automl_predict_tool
+                file_export_tool
             </div>
         </div>
       </div>

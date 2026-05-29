@@ -1,15 +1,9 @@
 FROM python:3.10-slim
 
-# System deps: libgomp (xgboost/lightgbm)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgomp1 \
-    && rm -rf /var/lib/apt/lists/*
 
-# --- Tabular / classical ML ---
+# --- Tabular / data analysis stack ---
 RUN pip install --no-cache-dir \
     pandas matplotlib openpyxl xlrd \
-    scikit-learn xgboost lightgbm \
     statsmodels scipy seaborn \
-    joblib imbalanced-learn \
     streamlit plotly \
     sqlalchemy pymysql sqlparse psycopg2-binary

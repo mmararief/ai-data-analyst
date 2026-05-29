@@ -1,26 +1,53 @@
-fastapi
-uvicorn[standard]
-python-jose[cryptography]
-bcrypt
-python-multipart
-sqlalchemy
-pymysql
-redis
-langchain-core
-langchain-google-genai
-langchain-openai
-langchain-ollama
-langgraph
-docker
-minio
-pandas
-numpy
-scikit-learn
-xgboost[cpu]
-lightgbm
-joblib
-matplotlib
-seaborn
-plotly
-streamlit
-tavily-python
+# =============================================================================
+# AI Data Analyst — Pinned dependencies
+# =============================================================================
+# Versions chosen to be the latest stable known-compatible combination as of
+# the project freeze. Update with care: the LangChain/LangGraph ecosystem
+# breaks APIs frequently between minor versions.
+#
+# To upgrade safely:
+#   1. Bump in a feature branch
+#   2. Rebuild Docker (`docker compose build --no-cache api worker`)
+#   3. Run `pytest` and exercise the chat flow before merging
+# =============================================================================
+
+# --- Web framework & ASGI ---
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+
+# --- Auth & security ---
+python-jose[cryptography]==3.3.0
+bcrypt==4.2.1
+python-multipart==0.0.20
+
+# --- Database & ORM ---
+sqlalchemy==2.0.36
+pymysql==1.1.1
+
+# --- Cache / queue ---
+redis==5.2.1
+
+# --- LangChain ecosystem ---
+# Pin to the same minor version family (0.3.x for langchain-core)
+# because cross-version mismatches cause cryptic runtime errors.
+langchain-core==0.3.28
+langchain-openai==0.2.14
+langchain-ollama==0.2.2
+langgraph==0.2.60
+
+# --- Container orchestration (sandbox) ---
+docker==7.1.0
+
+# --- Object storage ---
+minio==7.2.13
+
+# --- Data science stack ---
+numpy==1.26.4
+pandas==2.2.3
+
+
+# --- Visualization ---
+matplotlib==3.9.2
+seaborn==0.13.2
+plotly==5.24.1
+

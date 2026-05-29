@@ -19,6 +19,7 @@ export function CopyButton({ text }) {
 }
 
 export const mdComponents = {
+  img: () => null,
   p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
   strong: ({ children }) => <strong className="font-semibold text-[var(--text-heading)]">{children}</strong>,
   em: ({ children }) => <em className="italic text-[var(--text-secondary)]">{children}</em>,

@@ -26,7 +26,6 @@ export default defineConfig({
       },
       '/projects': 'http://localhost:8000',
       '/datasets': 'http://localhost:8000',
-      '/automl': 'http://localhost:8000',
       '/notebook': 'http://localhost:8000',
       '/history': 'http://localhost:8000',
       '/streamlit': 'http://localhost:8000',

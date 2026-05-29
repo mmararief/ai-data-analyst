@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from backend.core.security import get_current_user
 from backend.models.user import UserInDB
 from backend.agent_runner import run_agent_stream
+from backend.core.config import TEMP_ROOT
 from backend.core.minio_store import download_user_files, upload_generated_files
 from backend.core.job_store import (
     create_job, get_status, get_events_from, enqueue_job,
@@ -36,7 +37,8 @@ class StartRequest(BaseModel):
     project_id: str
     history: Optional[List[HistoryMessage]] = Field(default_factory=list)
     session_id: Optional[str] = None
-
+    mode: Optional[str] = "full"
+    approved_plan: Optional[list] = None
 
 # ── Existing endpoints (kept for backward compat) ──────────────────────────
 
@@ -46,7 +48,7 @@ def chat_stream(req: ChatRequest, user: UserInDB = Depends(get_current_user)):
     user_id = user.user_id
 
     def event_generator():
-        tmp = Path(tempfile.mkdtemp(prefix=f"sbx_{user_id[:8]}_"))
+        tmp = Path(tempfile.mkdtemp(prefix=f"sbx_{user_id[:8]}_", dir=str(TEMP_ROOT)))
         try:
             download_user_files(user_id, tmp, project_id=req.project_id)
             for event in run_agent_stream(tmp, req.question, history=history):
@@ -84,6 +86,8 @@ def chat_start(req: StartRequest, user: UserInDB = Depends(get_current_user)):
         "project_id": req.project_id,
         "question": req.question,
         "history": history,
+        "mode": req.mode,
+        "approved_plan": req.approved_plan,
         "submitted_at": time.time(),
     })
     return {"job_id": job_id, "session_id": session_id}

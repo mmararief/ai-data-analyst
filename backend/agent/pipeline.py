@@ -5,20 +5,18 @@ import re
 from collections import defaultdict
 from pathlib import Path
 
-from backend.agent.automl_pipeline import run_analysis_first_automl
 from backend.agent.classifier import (
     classify_request_type,
     is_simple_data_task,
-    looks_like_model_build_request,
 )
 from backend.agent.critic import run_critic_agent
 from backend.agent.executor import execute_task, run_phase_parallel
+from backend.agent.intent import run_intent_agent
 from backend.agent.llm import build_llm, invoke_with_retry
 from backend.agent.prompts import (
     CHART_RULE,
     CONTEXT_RULE,
     OUTPUT_DISCIPLINE_RULE,
-    STREAMLIT_RULE,
     PLANNER_SYSTEM_PROMPT,
 )
 from backend.agent.simple_handler import run_direct_llm, run_simple_data_task
@@ -37,81 +35,140 @@ def run_agent_stream(
     question: str,
     history: list | None = None,
     system_prompt: str = None,
+    mode: str = "full",
+    approved_plan: list | None = None,
 ):
     """
-    3-agent pipeline: Planner -> Executor -> Critic.
+    4-agent pipeline: Intent -> Planner -> Executor -> Critic.
 
     Each role uses its own model (configurable via env vars):
+      MODEL_INTENT   -- intent comprehension & clarification (default: MODEL_CHAT)
       MODEL_PLANNER  -- reasoning/planning  (default: MODEL_CHAT)
       MODEL_EXECUTOR -- code execution       (default: MODEL_CHAT)
       MODEL_CRITIC   -- evaluation/feedback  (default: MODEL_CHAT)
 
     Events emitted:
-      {"type": "agent_label", "content": "Planner|Execution|Critic"}
+      {"type": "agent_label", "content": "Intent|Planner|Execution|Critic"}
       {"type": "plan",        "content": [{"task": "...", "agent": "execution"}, ...]}
       {"type": "task_start",  "content": "...", "index": i, "total": n, "agent": "..."}
-      {"type": "text"|"code"|"output"|"progress"|"image"|"streamlit"|"error", "content": "..."}
+      {"type": "text"|"code"|"output"|"progress"|"image"|"error", "content": "..."}
+      {"type": "clarification", "questions": [{id, question, options, allow_multiple}, ...]}
       {"type": "critic",      "judgment": "ok"|"refine", "feedback": "...", "additional_tasks": [...]}
       {"type": "done"}
     """
-    from backend.core.config import MODEL_CHAT, MODEL_PLANNER, MODEL_EXECUTOR, MODEL_CRITIC
+    from backend.core.config import (
+        MODEL_CHAT, MODEL_INTENT, MODEL_PLANNER, MODEL_EXECUTOR, MODEL_CRITIC,
+    )
 
     history = history or []
 
     try:
-        request_type = classify_request_type(question, model=MODEL_CHAT)
-        if request_type == "smalltalk":
-            yield from run_direct_llm(question, history=history, model=MODEL_CHAT)
-            return
-
         file_list = list_data_contents(data_folder)
         schema_context = load_schema_context(data_folder)
 
-        # Pastikan simple data task tidak terseret ke AutoML hanya karena ada kata kunci model build
-        if is_simple_data_task(question):
-            yield from run_simple_data_task(
-                data_folder, question, MODEL_EXECUTOR, file_list, schema_context, history=history,
-            )
-            return
+        if mode in ["full", "plan_only"]:
+            request_type = classify_request_type(question, model=MODEL_CHAT, history=history)
+            if request_type == "smalltalk":
+                yield from run_direct_llm(question, history=history, model=MODEL_CHAT, file_list=file_list)
+                return
 
-        if looks_like_model_build_request(question):
-            yield from run_analysis_first_automl(data_folder, question, MODEL_PLANNER)
+        # Pastikan simple data task langsung dijawab tanpa full pipeline (hanya jika full mode)
+        # Jangan intercept di sini jika sedang dalam konteks follow-up data task
+        from backend.agent.classifier import _has_pending_data_context
+        if mode == "full" and is_simple_data_task(question) and not _has_pending_data_context(history):
+            yield from run_simple_data_task(
+                data_folder, question, MODEL_EXECUTOR, file_list, schema_context, history=history
+            )
             return
 
         history_text = build_history_context(history)
 
-        # -- Step 1: Planner Agent (MODEL_PLANNER) --
-        yield {"type": "agent_label", "content": "Planner"}
+        # -- Step 0: Intent Agent (MODEL_INTENT) --
+        # Skip the Intent layer when an approved plan is supplied — the user has
+        # already passed the clarification stage and we should go straight to
+        # execution. Also skip in pure execute_only mode for the same reason.
+        effective_question = question
+        skip_intent = bool(approved_plan) or mode == "execute_only"
 
-        planner_system = PLANNER_SYSTEM_PROMPT.format(
-            file_list=file_list,
-            schema_context=schema_context,
-        )
+        if not skip_intent and mode in ["full", "plan_only"]:
+            yield {"type": "agent_label", "content": "Intent"}
+            intent_result = run_intent_agent(
+                question=question,
+                file_list=file_list,
+                schema_context=schema_context,
+                model=MODEL_INTENT,
+                history=history,
+            )
 
-        plan = [{"task": question, "agent": "execution", "phase": 0}]
-        try:
-            llm_planner = build_llm(model=MODEL_PLANNER, temperature=0, max_output_tokens=1024)
-            planner_input = question + history_text
-            response = invoke_with_retry(llm_planner, [("system", planner_system), ("human", planner_input)])
-            raw = response.content if isinstance(response.content, str) else extract_text(response.content)
-            json_match = re.search(r"\[.*?\]", raw, re.DOTALL)
-            if json_match:
-                parsed = json.loads(json_match.group(0))
-                if isinstance(parsed, list) and parsed:
-                    plan = [
-                        {
-                            "task": str(item.get("task", item)),
-                            "agent": "execution",
-                            "phase": item.get("phase", idx),
-                        }
-                        if isinstance(item, dict)
-                        else {"task": str(item), "agent": "execution", "phase": idx}
-                        for idx, item in enumerate(parsed)
-                    ]
-        except Exception:
-            pass
+            # If the Intent Agent decided we need to ask the user, emit
+            # clarification and STOP the pipeline here. The frontend will
+            # collect the answers and re-submit a refined query.
+            if intent_result.get("needs_clarification") and intent_result.get("clarification_questions"):
+                yield {
+                    "type": "clarification",
+                    "questions": intent_result["clarification_questions"],
+                    "intent": intent_result.get("intent"),
+                    "reasoning": intent_result.get("reasoning", ""),
+                }
+                yield {"type": "done", "status": "waiting_clarification"}
+                return
 
-        yield {"type": "plan", "content": plan}
+            if intent_result.get("intent") not in ["eda", "viz"]:
+                yield from run_direct_llm(question, history=history, model=MODEL_CHAT, file_list=file_list)
+                return
+
+            # No clarification needed — use rewritten query if Intent Agent
+            # produced a more specific version of the user's request.
+            rewritten = intent_result.get("rewritten_query")
+            if rewritten:
+                effective_question = rewritten
+                
+            # Berikan basa-basi / salam sebelum Planner memikirkan rencana (agar pengguna tidak bingung menunggu)
+            opening = intent_result.get("opening_message")
+            if opening and isinstance(opening, str) and opening.strip():
+                yield {"type": "text", "content": opening.strip()}
+
+        if approved_plan and mode in ["execute_only", "full"]:
+            plan = approved_plan
+        else:
+            # -- Step 1: Planner Agent (MODEL_PLANNER) --
+            yield {"type": "agent_label", "content": "Planner"}
+
+            planner_system = PLANNER_SYSTEM_PROMPT.format(
+                file_list=file_list,
+                schema_context=schema_context,
+            )
+
+            plan = [{"task": effective_question, "agent": "execution", "phase": 0}]
+            try:
+                llm_planner = build_llm(model=MODEL_PLANNER, temperature=0, max_output_tokens=1024)
+                planner_input = effective_question + history_text
+                response = invoke_with_retry(llm_planner, [("system", planner_system), ("human", planner_input)])
+                raw = response.content if isinstance(response.content, str) else extract_text(response.content)
+                json_match = re.search(r"\{.*\}", raw, re.DOTALL)
+                if json_match:
+                    parsed = json.loads(json_match.group(0))
+                    if isinstance(parsed, dict):
+                        plan_data = parsed.get("plan", [])
+                        if isinstance(plan_data, list) and plan_data:
+                            plan = [
+                                {
+                                    "task": str(item.get("task", item)),
+                                    "agent": "execution",
+                                    "phase": idx,  # Always sequential — prevents interleaved text output
+                                }
+                                if isinstance(item, dict)
+                                else {"task": str(item), "agent": "execution", "phase": idx}
+                                for idx, item in enumerate(plan_data)
+                            ]
+            except Exception:
+                pass
+
+            yield {"type": "plan", "content": plan}
+
+            if mode == "plan_only":
+                yield {"type": "done", "status": "waiting_approval"}
+                return
 
         # -- Step 2: Execution Agent (MODEL_EXECUTOR) --
         yield {"type": "agent_label", "content": "Execution"}
@@ -121,20 +178,20 @@ def run_agent_stream(
             f"Dataset di '/app/data/':\n{file_list}\n\n"
             f"{schema_context}\n\n"
             "Aturan:\n"
-            "- WAJIB gunakan automl_train_tool untuk training/membuat/melatih model ML. DILARANG membuat pipeline ML manual\n"
-            "- automl_train_tool sudah otomatis: cleaning, feature engineering, training 5 model (RF, GBM, XGB, LGBM, Linear), hyperparameter tuning\n"
-            "- Untuk UNSUPERVISED / CLUSTERING: gunakan automl_train_tool dengan problem_type='clustering'. Target column isi string kosong ''. Jumlah cluster otomatis ditentukan.\n"
-            "- WAJIB gunakan automl_predict_tool untuk prediksi memakai model tersimpan\n"
-            "- Gunakan automl_list_models_tool jika perlu melihat model yang tersedia\n"
-            "- Gunakan python_repl_tool HANYA untuk analisis/EDA/visualisasi tanpa training model\n"
-            "- DILARANG membuat preprocessing manual (LabelEncoder, StandardScaler, train_test_split) untuk training model\n"
-            "- Gunakan web_search_tool untuk pertanyaan konsep/teori/best practice/benchmark/referensi terbaru. JANGAN untuk analisis data lokal\n"
-            "- Gunakan file_export_tool untuk mengekspor hasil analisis ke file (ipynb/csv/md/html/txt)\n"
+            "- Gunakan read_data_tool untuk inspect struktur dataset sebelum analisis (shape, kolom, tipe, preview)\n"
+            "- Gunakan render_chart_tool untuk SEMUA visualisasi, grafik, dan chart — JANGAN gunakan python_repl_tool untuk membuat chart\n"
+            "- Gunakan python_repl_tool untuk analisis data, EDA, preprocessing, dan operasi data lainnya\n"
+            "- Gunakan file_export_tool untuk mengekspor hasil analisis ke file (ipynb/csv/xlsx/json/md/html/txt/py)\n"
+            "- Gunakan data_profile_tool untuk membuat laporan profiling HTML otomatis dari dataset\n"
             "- Untuk file .sql/.db: gunakan python_repl_tool dengan sqlite3 atau sqlalchemy\n"
             "- Jika error, perbaiki otomatis\n"
             "- Berikan ringkasan singkat hasil setelah eksekusi\n"
+            "\nKRITIS — WAJIB DIIKUTI:\n"
+            "- JANGAN PERNAH mengarang atau memfabrikasi output analisis. Semua angka, metrik, dan hasil HARUS berasal dari eksekusi tool nyata.\n"
+            "- SELALU panggil python_repl_tool atau render_chart_tool untuk mengeksekusi kode. JANGAN tulis kode lalu langsung tulis hasil seolah sudah dieksekusi.\n"
+            "- SELALU gunakan path file lengkap '/app/data/nama_file.csv' — JANGAN gunakan nama file relatif seperti 'trip.csv' atau 'data.csv'.\n"
+            "- Setiap render_chart_tool HARUS memuat ulang data dari file (variabel tidak persisten antar tool call).\n"
             + CHART_RULE
-            + STREAMLIT_RULE
             + CONTEXT_RULE
             + OUTPUT_DISCIPLINE_RULE
             + history_text
@@ -146,7 +203,7 @@ def run_agent_stream(
             phases[phase].append((i, task_item))
 
         collected_outputs: list[str] = []
-        MAX_CONTEXT_CHARS = 4000
+        MAX_CONTEXT_CHARS = 6000
 
         for phase_num in sorted(phases.keys()):
             phase_tasks = phases[phase_num]
@@ -154,7 +211,7 @@ def run_agent_stream(
 
             prior_context = ""
             if collected_outputs:
-                ctx_block = "\n---\n".join(collected_outputs[-3:])
+                ctx_block = "\n---\n".join(collected_outputs[-5:])
                 if len(ctx_block) > MAX_CONTEXT_CHARS:
                     ctx_block = ctx_block[-MAX_CONTEXT_CHARS:]
                 prior_context = (

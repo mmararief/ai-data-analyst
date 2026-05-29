@@ -3,15 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import DataPreviewModal from './DataPreviewModal'
 
-const SUGGESTIONS = [
-  'Tampilkan 5 baris pertama',
-  'Berapa banyak data dan kolom?',
-  'Apakah ada nilai kosong?',
-  'Tampilkan statistik deskriptif',
-  'Buat bar chart kolom pertama',
-  'Tampilkan korelasi antar kolom numerik',
-]
-
 const MAX_FILES_PER_UPLOAD = 20
 
 const FILE_COLORS = {
@@ -72,7 +63,7 @@ function SectionHeader({ icon, label, open, onToggle }) {
   )
 }
 
-export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTrigger, isOpen, onClose, width }) {
+export default function Sidebar({ projectId, onSuggest, onLoadHistory, onNewChat, onToggleCollapse, refreshTrigger, isOpen, onClose, width }) {
   const [files, setFiles] = useState([])
   const [currentPath, setCurrentPath] = useState('')
   const [refreshing, setRefreshing] = useState(false)
@@ -82,7 +73,7 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
   const [previewFilename, setPreviewFilename] = useState(null)
   const [sessions, setSessions] = useState([])
   const [histOpen, setHistOpen] = useState(true)
-  const [suggestOpen, setSuggestOpen] = useState(false)
+
   const [filesOpen, setFilesOpen] = useState(true)
   const fileRef = useRef()
   const navigate = useNavigate()
@@ -209,7 +200,6 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
       minWidth: width || 288,
       height: '100%',
       background: 'var(--bg-sidebar)',
-      borderRight: '1px solid var(--border-primary)',
       display: 'flex', flexDirection: 'column',
       fontFamily: "'Syne', sans-serif",
       overflow: 'hidden',
@@ -217,59 +207,46 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
     }}>
       {/* Header */}
       <div style={{
-        padding: '1rem 1rem 0.75rem',
-        borderBottom: '1px solid var(--border-light)',
+        padding: '0.85rem 0.75rem',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <div style={{
-            width: 22, height: 22, borderRadius: 5,
-            background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 800, color: 'white',
-          }}>A</div>
-          <span style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: '0.65rem', letterSpacing: '0.1em',
-            color: 'var(--text-muted)', textTransform: 'uppercase',
-          }}>workspace</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+        {/* Burger icon — collapse sidebar */}
+        <button
+          onClick={onToggleCollapse || onClose}
+          style={{
+            width: 36, height: 36, borderRadius: 8,
+            background: 'none', border: 'none',
+            color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'color 0.2s, background 0.2s',
+            flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--bg-hover)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none' }}
+          title="Tutup Menu"
+        >
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
           <button
             onClick={() => fetchFiles(true, currentPath)}
             title="Refresh"
             style={{
-              width: 26, height: 26, borderRadius: 6,
-              background: 'none', border: '1px solid var(--border-primary)',
+              width: 28, height: 28, borderRadius: 7,
+              background: 'none', border: 'none',
               color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', transition: 'color 0.2s, border-color 0.2s',
+              cursor: 'pointer', transition: 'color 0.2s, background 0.2s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--analisai-cyan)'; e.currentTarget.style.borderColor = 'rgba(56,189,248,0.3)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-primary)' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--bg-hover)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none' }}
           >
-            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"
               style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
           </button>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="md:hidden flex items-center justify-center"
-              style={{
-                width: 26, height: 26, borderRadius: 6,
-                background: 'none', border: '1px solid var(--border-primary)',
-                color: 'var(--text-muted)',
-                cursor: 'pointer', transition: 'color 0.2s',
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-primary)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-            >
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-              </svg>
-            </button>
-          )}
         </div>
       </div>
 
@@ -281,6 +258,26 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
       }}
         className="sidebar-scroll"
       >
+        {/* NEW CHAT BUTTON */}
+        <button
+          onClick={() => { if (onNewChat) onNewChat(); if (onClose && window.innerWidth < 768) onClose() }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.5rem',
+            width: '100%', padding: '0.5rem 0.85rem',
+            background: 'transparent', border: 'none',
+            borderRadius: 9999, cursor: 'pointer',
+            fontFamily: "'Syne', sans-serif", fontSize: '0.82rem', fontWeight: 500,
+            color: 'var(--text-secondary)', transition: 'background 0.15s, color 0.15s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-sidebar-item)'; e.currentTarget.style.color = 'var(--text-primary)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)' }}
+        >
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+          </svg>
+          Chat Baru
+        </button>
+
         {/* ── DATASET FILES ── */}
         <div>
           <SectionHeader
@@ -317,24 +314,30 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
                 </button>
               )}
 
-              {/* Drop zone */}
+              {/* Add / Drop zone */}
               <div
                 onClick={() => !uploading && fileRef.current?.click()}
                 onDragOver={e => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
                 style={{
-                  border: `1px dashed ${dragOver ? 'rgba(56,189,248,0.5)' : 'var(--border-light)'}`,
-                  borderRadius: 10,
-                  padding: '0.85rem 0.75rem',
+                  border: dragOver ? '1px dashed var(--analisai-cyan)' : '1px solid transparent',
+                  borderRadius: 9999,
+                  padding: dragOver || uploading ? '0.85rem 0.75rem' : '0.45rem 1rem',
                   textAlign: 'center', cursor: 'pointer',
-                  background: dragOver ? 'rgba(56,189,248,0.04)' : 'transparent',
-                  transition: 'border-color 0.2s, background 0.2s',
-                  marginBottom: '0.6rem',
+                  background: dragOver ? 'rgba(56,189,248,0.05)' : 'var(--bg-card)',
+                  transition: 'border-color 0.2s, background 0.2s, padding 0.2s',
+                  marginBottom: '1rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  color: dragOver ? 'var(--analisai-cyan)' : 'var(--text-primary)',
+                  boxShadow: dragOver || uploading ? 'none' : 'var(--shadow-sm)',
+                  fontSize: '0.8rem', fontFamily: "'Syne', sans-serif", fontWeight: 600
                 }}
+                onMouseEnter={e => { if(!dragOver && !uploading) e.currentTarget.style.background = 'var(--bg-hover)' }}
+                onMouseLeave={e => { if(!dragOver && !uploading) e.currentTarget.style.background = 'var(--bg-card)' }}
               >
                 {uploading ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%' }}>
                     <div style={{
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: '0.62rem', color: 'var(--analisai-cyan)', letterSpacing: '0.06em',
@@ -349,27 +352,15 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
                         transition: 'width 0.3s',
                       }} />
                     </div>
-                    <div style={{
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: '0.58rem', color: 'var(--text-muted)',
-                    }}>
-                      ✓ {uploadProgress.success} · ✗ {uploadProgress.failed}
-                    </div>
                   </div>
+                ) : dragOver ? (
+                  <>Lepaskan file di sini...</>
                 ) : (
                   <>
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="var(--text-muted)"
-                      style={{ margin: '0 auto 0.4rem' }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
                     </svg>
-                    <div style={{
-                      fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: '0.62rem', color: 'var(--text-muted)',
-                      letterSpacing: '0.04em', lineHeight: 1.6,
-                    }}>
-                      klik atau drop file<br/>
-                      <span style={{ color: 'var(--text-muted)', opacity: 0.6, fontSize: '0.58rem' }}>csv · xlsx · json · parquet · pkl</span>
-                    </div>
+                    Tambah Dataset
                   </>
                 )}
               </div>
@@ -393,41 +384,39 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
                     onClick={() => f.type === 'folder' && goToFolder(f.path || f.name)}
                     className="sidebar-file-row"
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '0.5rem',
-                      padding: '0.5rem 0.6rem',
-                      borderRadius: 8,
-                      background: 'var(--bg-hover)',
-                      border: '1px solid var(--border-light)',
+                      display: 'flex', alignItems: 'center', gap: '0.75rem',
+                      padding: '0.65rem 1rem',
+                      borderRadius: 9999,
+                      background: 'transparent',
                       cursor: f.type === 'folder' ? 'pointer' : 'default',
-                      transition: 'background 0.15s, border-color 0.15s',
+                      transition: 'background 0.2s',
                       position: 'relative',
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.background = 'var(--bg-sidebar-item)'
-                      e.currentTarget.style.borderColor = 'var(--border-primary)'
                       e.currentTarget.querySelectorAll('.file-action').forEach(b => b.style.opacity = '1')
                     }}
                     onMouseLeave={e => {
-                      e.currentTarget.style.background = 'var(--bg-hover)'
-                      e.currentTarget.style.borderColor = 'var(--border-light)'
+                      e.currentTarget.style.background = 'transparent'
                       e.currentTarget.querySelectorAll('.file-action').forEach(b => b.style.opacity = '0')
                     }}
                   >
                     <FileIcon name={f.name} type={f.type} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontSize: '0.78rem', color: '#94a3b8',
+                        fontSize: '0.78rem', color: 'var(--text-secondary)',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }} title={f.path || f.name}>{f.name}</div>
                       <div style={{
                         fontFamily: "'JetBrains Mono', monospace",
-                        fontSize: '0.58rem', color: 'var(--text-muted)',
+                        fontSize: '0.6rem', color: 'var(--text-muted)', opacity: 0.5, marginTop: '0.1rem'
                       }}>{f.size_kb} KB</div>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.2rem', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', gap: '0.2rem', flexShrink: 0, position: 'absolute', right: '0.5rem', background: 'transparent' }} className="file-action-container">
                       {['.csv','.xlsx','.xls','.json','.parquet'].some(e => f.name.toLowerCase().endsWith(e)) && (
                         <button className="file-action" onClick={ev => { ev.stopPropagation(); setPreviewFilename(f.path || f.name) }}
-                          style={{ opacity:0, width:22, height:22, borderRadius:5, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-muted)', transition:'color 0.15s, opacity 0.15s' }}
+                          style={{ opacity:0, width:26, height:26, borderRadius:5, background:'var(--bg-hover)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-muted)', transition:'color 0.15s, opacity 0.15s' }}
+
                           onMouseEnter={e => e.currentTarget.style.color='#38bdf8'}
                           onMouseLeave={e => e.currentTarget.style.color='#334155'}
                           title="Preview"
@@ -437,7 +426,7 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
                       )}
                       {f.type !== 'folder' && (
                         <button className="file-action" onClick={e => { e.stopPropagation(); handleDownload(f.path || f.name) }}
-                          style={{ opacity:0, width:22, height:22, borderRadius:5, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-muted)', transition:'color 0.15s, opacity 0.15s' }}
+                          style={{ opacity:0, width:26, height:26, borderRadius:5, background:'var(--bg-hover)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-muted)', transition:'color 0.15s, opacity 0.15s' }}
                           onMouseEnter={e => e.currentTarget.style.color='#38bdf8'}
                           onMouseLeave={e => e.currentTarget.style.color='#334155'}
                           title="Download"
@@ -446,7 +435,7 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
                         </button>
                       )}
                       <button className="file-action" onClick={e => { e.stopPropagation(); handleDelete(f.path || f.name) }}
-                        style={{ opacity:0, width:22, height:22, borderRadius:5, background:'none', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-muted)', transition:'color 0.15s, opacity 0.15s' }}
+                        style={{ opacity:0, width:26, height:26, borderRadius:5, background:'var(--bg-hover)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-muted)', transition:'color 0.15s, opacity 0.15s' }}
                         onMouseEnter={e => e.currentTarget.style.color='#f87171'}
                         onMouseLeave={e => e.currentTarget.style.color='var(--text-muted)'}
                         title="Hapus"
@@ -461,19 +450,23 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
                   <button
                     onClick={handleDeleteAll}
                     style={{
-                      width: '100%', padding: '0.4rem',
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      padding: '0.3rem 0.85rem',
                       fontFamily: "'JetBrains Mono', monospace",
-                      fontSize: '0.6rem', letterSpacing: '0.08em',
+                      fontSize: '0.6rem', letterSpacing: '0.06em',
                       color: 'var(--text-muted)', background: 'none',
-                      border: '1px solid var(--border-light)',
-                      borderRadius: 6, cursor: 'pointer',
-                      transition: 'color 0.2s, border-color 0.2s',
-                      marginTop: '0.25rem',
+                      border: 'none',
+                      borderRadius: 9999, cursor: 'pointer',
+                      transition: 'color 0.2s, background 0.2s',
+                      marginTop: '0.1rem',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)' }}
-                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.borderColor = 'var(--border-light)' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#f87171'; e.currentTarget.style.background = 'rgba(239,68,68,0.06)' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'none' }}
                   >
-                    hapus semua ({files.length})
+                    <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Hapus semua ({files.length})
                   </button>
                 )}
               </div>
@@ -481,7 +474,7 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
           )}
         </div>
 
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.04)', flexShrink: 0 }} />
+        <div style={{ height: 1, background: 'var(--border-light)', flexShrink: 0, margin: '0 0.5rem' }} />
 
         {/* ── RIWAYAT CHAT ── */}
         <div>
@@ -504,33 +497,31 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
                   key={s.session_id}
                   onClick={() => handleLoadSession(s.session_id)}
                   style={{
-                    padding: '0.6rem 0.7rem',
-                    borderRadius: 8, cursor: 'pointer',
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.04)',
-                    transition: 'background 0.15s, border-color 0.15s',
+                    padding: '0.65rem 1rem',
+                    borderRadius: 9999, cursor: 'pointer',
+                    background: 'transparent',
+                    transition: 'background 0.2s',
                     position: 'relative',
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.background = 'var(--bg-sidebar-item)'
-                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.15)'
                     e.currentTarget.querySelector('.hist-del').style.opacity = '1'
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.background = 'var(--bg-hover)'
-                    e.currentTarget.style.borderColor = 'var(--border-light)'
+                    e.currentTarget.style.background = 'transparent'
                     e.currentTarget.querySelector('.hist-del').style.opacity = '0'
                   }}
                 >
-                  <div style={{
-                    fontSize: '0.78rem', color: '#64748b',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    paddingRight: '1.5rem', marginBottom: '0.2rem',
-                  }} title={s.title}>{s.title}</div>
-                  <div style={{
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: '0.58rem', color: 'var(--text-muted)',
-                  }}>{formatDate(s.created_at)} · {s.message_count} pesan</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--text-muted)" style={{flexShrink:0}}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                    </svg>
+                    <div style={{
+                      fontSize: '0.8rem', color: 'var(--text-secondary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      paddingRight: '1.5rem',
+                    }} title={s.title}>{s.title}</div>
+                  </div>
                   <button
                     className="hist-del"
                     onClick={e => handleDeleteSession(e, s.session_id)}
@@ -554,47 +545,7 @@ export default function Sidebar({ projectId, onSuggest, onLoadHistory, refreshTr
           )}
         </div>
 
-        <div style={{ height: 1, background: 'rgba(255,255,255,0.04)', flexShrink: 0 }} />
 
-        {/* ── SARAN PERTANYAAN ── */}
-        <div>
-          <SectionHeader
-            icon={<svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>}
-            label="Saran"
-            open={suggestOpen}
-            onToggle={() => setSuggestOpen(o => !o)}
-          />
-          {suggestOpen && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {SUGGESTIONS.map(q => (
-                <button
-                  key={q}
-                  onClick={() => { onSuggest(q); if (onClose) onClose() }}
-                  style={{
-                    width: '100%', textAlign: 'left', padding: '0.55rem 0.7rem',
-                    borderRadius: 7, cursor: 'pointer', fontSize: '0.78rem',
-                    color: 'var(--text-muted)', background: 'var(--bg-hover)',
-                    border: '1px solid var(--border-light)',
-                    fontFamily: "'Syne', sans-serif",
-                    transition: 'color 0.15s, background 0.15s, border-color 0.15s',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.color = 'var(--analisai-cyan)'
-                    e.currentTarget.style.background = 'rgba(56,189,248,0.05)'
-                    e.currentTarget.style.borderColor = 'rgba(56,189,248,0.2)'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.color = 'var(--text-muted)'
-                    e.currentTarget.style.background = 'var(--bg-hover)'
-                    e.currentTarget.style.borderColor = 'var(--border-light)'
-                  }}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
       {previewFilename && (

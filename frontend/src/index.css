@@ -7,95 +7,104 @@
    Theme CSS Variables
    ═══════════════════════════════════════════════ */
 
-/* Light mode (default) */
+/* Base Gemini Light Theme */
 :root {
   --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --bg-page: #f8fafc;
-  --bg-header: rgba(255,255,255,0.85);
-  --bg-input: #f1f5f9;
+  --bg-secondary: #f0f4f9;
+  --bg-tertiary: #e9eef6;
+  --bg-page: #ffffff;
+  --bg-header: #ffffff;
+  --bg-input: #f0f4f9;
   --bg-card: #ffffff;
-  --bg-sidebar: #f1f5f9;
-  --bg-sidebar-item: #e2e8f0;
-  --bg-bubble-user: #e0f2fe;
-  --bg-bubble-ai: #ffffff;
-  --bg-code: #1e1e2e;
-  --bg-output: #f8fafc;
-  --bg-overlay: rgba(0,0,0,0.3);
-  --bg-hover: rgba(0,0,0,0.04);
-  --bg-dropzone: #f0f9ff;
+  --bg-sidebar: #f0f4f9;
+  --bg-sidebar-item: rgba(0, 0, 0, 0.05);
+  --bg-bubble-user: rgba(0,0,0,0.03);
+  --bg-bubble-ai: transparent;
+  --bg-code: #f8fafc;
+  --bg-output: #ffffff;
+  --bg-overlay: rgba(255,255,255,0.5);
+  --bg-hover: rgba(0, 0, 0, 0.05);
+  --bg-dropzone: rgba(0, 0, 0, 0.02);
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --text-heading: #0f172a;
+  --text-primary: #1f1f1f;
+  --text-secondary: #444746;
+  --text-muted: #5f6368;
+  --text-heading: #1f1f1f;
   --text-inverse: #ffffff;
-  --text-accent: #0284c7;
+  --text-accent: #0b57d0;
 
-  --border-primary: #e2e8f0;
-  --border-light: #f1f5f9;
-  --border-input: #cbd5e1;
+  --border-primary: rgba(0,0,0,0.08);
+  --border-light: rgba(0,0,0,0.04);
+  --border-input: transparent;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
   --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
 
-  --scrollbar-thumb: #cbd5e1;
-  --scrollbar-thumb-hover: #94a3b8;
+  --scrollbar-thumb: #c4c7c5;
+  --scrollbar-thumb-hover: #8e918f;
 
   /* Analisai Specific */
   --analisai-bg: #f8fafc;
-  --analisai-cyan: #0284c7;
-  --analisai-text: #0f172a;
+  --analisai-bg2: #ffffff;
+  --analisai-bg3: #e2e8f0;
+  --analisai-cyan: #0b57d0;
+  --analisai-cyan2: #0842a0;
+  --analisai-text: #1f1f1f;
+  
+  --btn-send-bg: #1f1f1f;
+  --btn-send-icon: #ffffff;
 
   color-scheme: light;
 }
 
-/* Dark mode */
+/* Gemini Dark Theme */
 .dark {
-  --bg-primary: #020617;
-  --bg-secondary: #0f0f18;
-  --bg-tertiary: #12121e;
-  --bg-page: #020617;
-  --bg-header: rgba(15,15,24,0.8);
-  --bg-input: rgba(255,255,255,0.05);
-  --bg-card: #0d1117;
-  --bg-sidebar: #0a0a12;
-  --bg-sidebar-item: rgba(255,255,255,0.05);
-  --bg-bubble-user: rgba(14,165,233,0.08);
-  --bg-bubble-ai: #0d1117;
+  --bg-primary: #131314;
+  --bg-secondary: #1e1f20;
+  --bg-tertiary: #282a2c;
+  --bg-page: #131314;
+  --bg-header: #131314;
+  --bg-input: #1e1f20;
+  --bg-card: #1e1f20;
+  --bg-sidebar: #1e1f20;
+  --bg-sidebar-item: rgba(255, 255, 255, 0.08);
+  --bg-bubble-user: rgba(255,255,255,0.06);
+  --bg-bubble-ai: transparent;
   --bg-code: #1e1e2e;
-  --bg-output: #0d1117;
+  --bg-output: #131314;
   --bg-overlay: rgba(0,0,0,0.5);
-  --bg-hover: rgba(255,255,255,0.03);
-  --bg-dropzone: rgba(56,189,248,0.05);
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-dropzone: rgba(255, 255, 255, 0.02);
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #e3e3e3;
+  --text-secondary: #c4c7c5;
+  --text-muted: #8e918f;
   --text-heading: #ffffff;
-  --text-inverse: #0f172a;
-  --text-accent: #38bdf8;
+  --text-inverse: #131314;
+  --text-accent: #a8c7fa;
 
   --border-primary: rgba(255,255,255,0.1);
   --border-light: rgba(255,255,255,0.05);
-  --border-input: rgba(255,255,255,0.1);
+  --border-input: transparent;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.4);
   --shadow-lg: 0 10px 15px rgba(0,0,0,0.5);
 
-  --scrollbar-thumb: #1e293b;
-  --scrollbar-thumb-hover: #334155;
+  --scrollbar-thumb: #444746;
+  --scrollbar-thumb-hover: #5f6368;
 
   /* Analisai Specific */
-  --analisai-bg: #03050f;
-  --analisai-bg2: #060916;
-  --analisai-bg3: #0a0e1a;
-  --analisai-cyan: #38bdf8;
-  --analisai-cyan2: #0ea5e9;
-  --analisai-text: #e2e8f0;
+  --analisai-bg: #131314;
+  --analisai-bg2: #1e1f20;
+  --analisai-bg3: #282a2c;
+  --analisai-cyan: #a8c7fa;
+  --analisai-cyan2: #7cacf8;
+  --analisai-text: #e3e3e3;
+  
+  --btn-send-bg: #e3e3e3;
+  --btn-send-icon: #131314;
 
   color-scheme: dark;
 }
@@ -117,7 +126,7 @@ body {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #38bdf8; /* Cyan-400 */
+  background: #a8c7fa; /* Gemini highlight */
   animation: typingBounce 1.2s infinite ease-in-out;
 }
 .typing-dot:nth-child(2) { animation-delay: 0.15s; }

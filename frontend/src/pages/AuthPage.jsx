@@ -17,95 +17,11 @@ function EyeIcon({ open }) {
   )
 }
 
-// ── Animated canvas background ────────────────────────────────────────────────
-function CanvasBg() {
-  const canvasRef = useRef(null)
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    let W, H, particles = [], animId
-
-    function resize() {
-      W = canvas.width = canvas.offsetWidth
-      H = canvas.height = canvas.offsetHeight
-    }
-    resize()
-    window.addEventListener('resize', resize)
-
-    for (let i = 0; i < 40; i++) {
-      particles.push({
-        x: Math.random() * W, y: Math.random() * H,
-        vx: (Math.random() - 0.5) * 0.25,
-        vy: (Math.random() - 0.5) * 0.25,
-        r: Math.random() * 1.2 + 0.3,
-        a: Math.random() * 0.3 + 0.04,
-      })
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, W, H)
-
-      // Grid
-      ctx.strokeStyle = 'rgba(56,189,248,0.04)'
-      ctx.lineWidth = 0.5
-      for (let x = 0; x < W; x += 60) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
-      }
-      for (let y = 0; y < H; y += 60) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
-      }
-
-      particles.forEach(p => {
-        p.x += p.vx; p.y += p.vy
-        if (p.x < 0) p.x = W; if (p.x > W) p.x = 0
-        if (p.y < 0) p.y = H; if (p.y > H) p.y = 0
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-        ctx.fillStyle = `rgba(56,189,248,${p.a})`
-        ctx.fill()
-      })
-
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x
-          const dy = particles[i].y - particles[j].y
-          const d = Math.sqrt(dx * dx + dy * dy)
-          if (d < 100) {
-            ctx.beginPath()
-            ctx.moveTo(particles[i].x, particles[i].y)
-            ctx.lineTo(particles[j].x, particles[j].y)
-            ctx.strokeStyle = `rgba(56,189,248,${0.05 * (1 - d / 100)})`
-            ctx.lineWidth = 0.5
-            ctx.stroke()
-          }
-        }
-      }
-      animId = requestAnimationFrame(draw)
-    }
-    draw()
-
-    return () => {
-      cancelAnimationFrame(animId)
-      window.removeEventListener('resize', resize)
-    }
-  }, [])
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 w-full h-full"
-      style={{ opacity: 0.7 }}
-    />
-  )
-}
-
-// ── Typewriter for left panel ─────────────────────────────────────────────────
+// ── Animated canvas background removed for clean UI ────────────────────────
 const DEMO_LINES = [
   { prefix: '> ', text: 'prediksi churn customers.csv', color: '#e2e8f0' },
   { prefix: '  ✓ ', text: 'Planner: 3 tasks, 2 phases', color: '#38bdf8' },
-  { prefix: '  ✓ ', text: 'AutoML: LightGBM acc=0.934', color: '#86efac' },
+  { prefix: '  ✓ ', text: 'EDA: distribusi & korelasi', color: '#86efac' },
   { prefix: '  ✓ ', text: 'Critic: judgment = ok', color: '#86efac' },
   { prefix: '> ', text: 'visualisasi korelasi features', color: '#e2e8f0' },
   { prefix: '  ✓ ', text: 'Chart saved: _chart_ab3f.png', color: '#38bdf8' },
@@ -195,9 +111,7 @@ function AuthInput({ label, type, placeholder, value, onChange, required, rightE
             border: `1px solid ${focused ? 'rgba(56,189,248,0.5)' : 'rgba(255,255,255,0.08)'}`,
             borderRadius: 10,
             padding: rightEl ? '0.8rem 2.8rem 0.8rem 1rem' : '0.8rem 1rem',
-            color: '#e2e8f0',
-            fontFamily: "'Syne', sans-serif",
-            fontSize: '0.9rem',
+            fontFamily: "sans-serif",
             outline: 'none',
             transition: 'border-color 0.2s, box-shadow 0.2s',
             boxShadow: focused ? '0 0 0 3px rgba(56,189,248,0.08), inset 0 0 20px rgba(56,189,248,0.02)' : 'none',
@@ -281,19 +195,13 @@ export default function AuthPage({ onLogin }) {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
-        @keyframes termLine { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
         @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
         @keyframes spin { to{transform:rotate(360deg)} }
-        @keyframes pulseGlow { 0%,100%{box-shadow:0 0 0 0 rgba(56,189,248,0)} 50%{box-shadow:0 0 20px 4px rgba(56,189,248,0.15)} }
 
         .auth-input-placeholder::placeholder { color: #334155; }
 
         .auth-submit-btn:hover:not(:disabled) {
           transform: translateY(-1px);
-          box-shadow: 0 0 40px rgba(56,189,248,0.35), 0 8px 24px rgba(0,0,0,0.4) !important;
         }
         .auth-submit-btn:active:not(:disabled) { transform: translateY(0); }
 
@@ -312,12 +220,10 @@ export default function AuthPage({ onLogin }) {
 
       <div style={{
         minHeight: '100vh',
-        background: '#03050f',
+        background: '#020617', // slate-950
         display: 'flex',
         justifyContent: 'center',
-        fontFamily: "'Syne', sans-serif",
-        position: 'relative',
-        overflow: 'hidden',
+        fontFamily: "sans-serif",
       }}>
 
         {/* ── Left panel — decorative ── */}
@@ -329,17 +235,7 @@ export default function AuthPage({ onLogin }) {
           overflow: 'hidden',
         }} className="lg:block" >
 
-          {/* Canvas bg */}
-          <div style={{ position: 'absolute', inset: 0 }}>
-            <CanvasBg />
-          </div>
-
-          {/* Gradient overlay */}
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'radial-gradient(ellipse 70% 60% at 30% 40%, rgba(14,165,233,0.05) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }} />
+          {/* Clean background area */}
 
           {/* Content */}
           <div style={{
@@ -353,10 +249,9 @@ export default function AuthPage({ onLogin }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <div style={{
                 width: 32, height: 32, borderRadius: 8,
-                background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+                background: '#0284c7',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 14, fontWeight: 800, color: 'white',
-                boxShadow: '0 0 20px rgba(56,189,248,0.3)',
+                fontSize: 14, fontWeight: 800, color: 'white'
               }}>A</div>
               <span style={{ fontSize: '1rem', fontWeight: 700, color: '#f0f9ff', letterSpacing: '-0.02em' }}>
                 Analisai
@@ -438,7 +333,7 @@ export default function AuthPage({ onLogin }) {
 
               {/* Feature tags */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {['AutoML', 'LangGraph', 'Docker Sandbox', 'Streaming', 'Streamlit'].map(tag => (
+                {['EDA', 'LangGraph', 'Docker Sandbox', 'Streaming', 'ML Pipeline'].map(tag => (
                   <div key={tag} className="feature-tag" style={{
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: '0.62rem', letterSpacing: '0.08em',
@@ -509,12 +404,10 @@ export default function AuthPage({ onLogin }) {
               {/* Logo mark */}
               <div style={{
                 width: 52, height: 52, borderRadius: 14,
-                background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+                background: '#0284c7',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 22, fontWeight: 800, color: 'white',
-                margin: '0 auto 1.25rem',
-                boxShadow: '0 0 32px rgba(56,189,248,0.25)',
-                animation: 'pulseGlow 3s ease-in-out infinite',
+                margin: '0 auto 1.25rem'
               }}>A</div>
 
               <h1 style={{
@@ -630,30 +523,18 @@ export default function AuthPage({ onLogin }) {
                 className="auth-submit-btn"
                 style={{
                   width: '100%', height: 50, marginTop: '0.5rem',
-                  background: loading
-                    ? 'rgba(14,165,233,0.3)'
-                    : 'linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)',
+                  background: loading ? '#0ea5e988' : '#0284c7',
                   border: 'none', borderRadius: 10,
-                  color: 'white', fontFamily: "'Syne', sans-serif",
+                  color: 'white', fontFamily: "sans-serif",
                   fontSize: '0.9rem', fontWeight: 700,
                   letterSpacing: '0.01em',
                   cursor: loading ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                  transition: 'transform 0.15s, box-shadow 0.2s, background 0.2s',
-                  boxShadow: '0 0 24px rgba(56,189,248,0.2), 0 4px 16px rgba(0,0,0,0.4)',
+                  transition: 'transform 0.15s, background 0.2s',
                   position: 'relative', overflow: 'hidden',
                   opacity: loading ? 0.7 : 1,
                 }}
               >
-                {/* Shimmer */}
-                {!loading && (
-                  <span style={{
-                    position: 'absolute', inset: 0,
-                    background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
-                    backgroundSize: '200% 100%',
-                    animation: 'shimmer 2.5s ease-in-out infinite',
-                  }} />
-                )}
                 <span style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   {loading ? (
                     <>

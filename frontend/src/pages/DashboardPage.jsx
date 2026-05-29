@@ -79,8 +79,8 @@ function ProjectCard({ project, index, onNavigate, onEdit, onDelete }) {
       style={{
         position:'relative',
         background: hovered ? 'var(--bg-hover)' : 'var(--bg-card)',
-        border: `1px solid ${hovered ? accent + '40' : 'var(--border-primary)'}`,
-        borderRadius:14,
+        border: `1px solid ${hovered ? accent + '40' : 'transparent'}`,
+        borderRadius:24,
         padding:'1.5rem',
         cursor:'pointer',
         transition:'all 0.2s',
@@ -308,12 +308,9 @@ export default function DashboardPage({ username, onLogout }) {
           }} />
         </div>
 
-        {/* ── HEADER ── */}
         <header style={{
           position:'sticky', top:0, zIndex:50,
-          background:'var(--bg-header)',
-          backdropFilter:'blur(16px)',
-          borderBottom:'1px solid var(--border-primary)',
+          background:'transparent',
           animation:'fadeDown 0.5s ease both',
         }}>
           <div style={{
@@ -324,14 +321,10 @@ export default function DashboardPage({ username, onLogout }) {
           }}>
             {/* Logo */}
             <div style={{ display:'flex', alignItems:'center', gap:'0.6rem' }}>
-              <div style={{
-                width:28, height:28, borderRadius:7,
-                background:'linear-gradient(135deg,#0ea5e9,#6366f1)',
-                display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:13, fontWeight:800, color:'white',
-                boxShadow:'0 0 16px rgba(56,189,248,0.2)',
-              }}>A</div>
-              <span style={{ fontSize:'1rem', fontWeight:800, color:'#f0f9ff', letterSpacing:'-0.02em' }}>
+              <span style={{ 
+                fontSize:'1.25rem', fontWeight:500, color:'var(--text-secondary)', letterSpacing:'-0.02em',
+                fontFamily:"'Syne',sans-serif"
+              }}>
                 Analisai
               </span>
             </div>
@@ -380,21 +373,16 @@ export default function DashboardPage({ username, onLogout }) {
                 )}
               </button>
 
-              {/* Logout */}
-              <button
-                className="dash-logout"
-                onClick={onLogout}
-                style={{
-                  fontFamily:"'JetBrains Mono',monospace", fontSize:'0.65rem',
-                  letterSpacing:'0.08em', color:'var(--text-muted)',
-                  background:'var(--bg-hover)',
-                  border:'1px solid var(--border-primary)',
-                  borderRadius:6, padding:'0.35rem 0.8rem',
-                  cursor:'pointer', transition:'color 0.2s, border-color 0.2s',
-                }}
-              >
-                KELUAR
-              </button>
+              {/* Logout/Avatar */}
+              <div style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, fontWeight: 800, color: 'white',
+                  cursor: 'pointer'
+                }} title="Keluar" onClick={onLogout}>
+                  {username ? username.charAt(0).toUpperCase() : 'A'}
+              </div>
             </div>
           </div>
         </header>
@@ -451,12 +439,11 @@ export default function DashboardPage({ username, onLogout }) {
               style={{
                 display:'flex', alignItems:'center', gap:'0.5rem',
                 height:44, padding:'0 1.4rem',
-                background:'linear-gradient(135deg,#0ea5e9,#6366f1)',
-                border:'none', borderRadius:10,
-                fontFamily:"'Syne',sans-serif", fontSize:'0.88rem', fontWeight:700,
-                color:'white', cursor:'pointer',
+                background:'#e3e3e3',
+                border:'none', borderRadius:9999,
+                fontFamily:"'Syne',sans-serif", fontSize:'0.88rem', fontWeight:600,
+                color:'#131314', cursor:'pointer',
                 transition:'transform 0.15s, box-shadow 0.2s',
-                boxShadow:'0 0 24px rgba(56,189,248,0.2), 0 4px 16px rgba(0,0,0,0.4)',
               }}
             >
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -494,13 +481,13 @@ export default function DashboardPage({ username, onLogout }) {
                   onBlur={() => setSearchFocused(false)}
                   style={{
                     width:'100%',
-                    background:'var(--bg-hover)',
-                    border:`1px solid ${searchFocused ? 'rgba(56,189,248,0.4)' : 'var(--border-primary)'}`,
-                    borderRadius:8, padding:'0.65rem 1rem 0.65rem 2.4rem',
-                    color:'var(--text-primary)', fontFamily:"'Syne',sans-serif", fontSize:'0.85rem',
+                    background:'var(--bg-input)',
+                    border:`1px solid ${searchFocused ? 'rgba(255,255,255,0.1)' : 'transparent'}`,
+                    borderRadius:9999, padding:'0.75rem 1rem 0.75rem 2.4rem',
+                    color:'var(--text-primary)', fontFamily:"'Syne',sans-serif", fontSize:'0.9rem',
                     outline:'none',
                     transition:'border-color 0.2s, box-shadow 0.2s',
-                    boxShadow: searchFocused ? '0 0 0 3px rgba(56,189,248,0.07)' : 'none',
+                    boxShadow: searchFocused ? '0 0 0 4px rgba(255,255,255,0.03)' : 'none',
                   }}
                 />
                 {search && (
@@ -637,7 +624,7 @@ export default function DashboardPage({ username, onLogout }) {
                 onClick={() => setShowCreate(true)}
                 style={{
                   border:'1px dashed var(--border-primary)',
-                  borderRadius:14, padding:'1.5rem',
+                  borderRadius:24, padding:'1.5rem',
                   display:'flex', flexDirection:'column',
                   alignItems:'center', justifyContent:'center',
                   cursor:'pointer', minHeight:160,

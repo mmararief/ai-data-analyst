@@ -1,56 +1,83 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ToolCallStep from './ToolCallStep'
 
+// Deduplicate steps: skip steps with identical code as previous
+function dedupeSteps(steps) {
+  const seen = new Set()
+  return steps.filter(s => {
+    const key = (s.code || '').trim()
+    if (!key) return true
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 export default function ToolCallGroup({ steps, projectId, isLoading }) {
-  const [open, setOpen] = useState(false)
-  
+  const [open, setOpen] = useState(true) // starts open while running
+  const prevLoadingRef = useRef(isLoading)
+
+  // Auto-collapse when done
+  useEffect(() => {
+    if (prevLoadingRef.current && !isLoading) {
+      setOpen(false)
+    }
+    prevLoadingRef.current = isLoading
+  }, [isLoading])
+
   if (steps.length === 0) return null
-  
-  // If only one step and we don't want to group yet, it could still use this or the old individual one.
-  // But grouping even a single one for consistency is fine.
-  
-  const isLastRunning = isLoading && !steps[steps.length - 1].output
+
+  const deduped = dedupeSteps(steps)
+  const doneCount = deduped.filter(s => s.output !== undefined && s.output !== '').length
+  const isRunningNow = isLoading && doneCount < deduped.length
 
   return (
-    <div className="my-3 border border-[var(--border-primary)] rounded-lg overflow-hidden bg-[var(--bg-tertiary)]/20 shadow-sm">
+    <div className="my-3 select-none">
+      {/* ── Header ── */}
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-hover)] transition-colors text-left"
+        className="flex items-center gap-2 text-[12.5px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors group mb-1"
       >
-        <div className="flex items-center justify-center w-6 h-6 rounded-md bg-[var(--analisai-cyan)]/10 text-[var(--analisai-cyan)] border border-[var(--analisai-cyan)]/20">
-           {isLastRunning ? (
-             <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-           ) : (
-             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
-           )}
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-bold text-[var(--text-heading)] flex items-center gap-2">
-            {isLastRunning ? 'Mengeksekusi Analisis...' : 'Analisis Python Selesai'}
-            <span className="text-[10px] font-normal text-[var(--text-muted)] bg-[var(--bg-hover)] px-1.5 py-0.5 rounded border border-[var(--border-light)] uppercase tracking-wider">
-              {steps.length} {steps.length > 1 ? 'langkah' : 'langkah'}
-            </span>
-          </div>
-          <div className="text-[11px] text-[var(--text-muted)] truncate italic mt-0.5">
-            {isLastRunning ? 'Memproses tugas data di sandbox terisolasi...' : 'Semua transformasi data dan perhitungan selesai.'}
-          </div>
-        </div>
-
-        <svg className={`w-4 h-4 text-[var(--text-muted)] transition-transform duration-300 ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+        {/* chevron */}
+        <svg
+          className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
         </svg>
+
+        {isRunningNow ? (
+          <>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
+            </span>
+            <span className="font-medium">
+              Menjalankan {deduped.length} langkah analisis…
+            </span>
+          </>
+        ) : (
+          <>
+            {/* checkmark */}
+            <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="font-medium">
+              Selesai · {deduped.length} langkah
+            </span>
+          </>
+        )}
       </button>
 
+      {/* ── Steps list ── */}
       {open && (
-        <div className="px-4 pb-4 space-y-3 bg-[var(--bg-tertiary)]/10 border-t border-[var(--border-primary)] animate-slide-down">
-          <div className="h-2" /> {/* spacing */}
-          {steps.map((step, i) => (
-            <ToolCallStep 
-              key={i} 
-              step={step} 
-              index={i} 
-              isRunning={isLoading && i === steps.length - 1 && !step.output} 
+        <div className="ml-1 pl-3 border-l border-[var(--border-primary)] space-y-0.5 py-1">
+          {deduped.map((step, i) => (
+            <ToolCallStep
+              key={i}
+              step={step}
+              index={i}
+              isRunning={isLoading && i === deduped.length - 1 && !step.output}
             />
           ))}
         </div>

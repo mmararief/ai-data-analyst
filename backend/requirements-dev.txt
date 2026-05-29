@@ -1,0 +1,14 @@
+# =============================================================================
+# Development-only dependencies (testing, linting)
+# Install with:  pip install -r backend/requirements.txt -r backend/requirements-dev.txt
+# =============================================================================
+
+-r requirements.txt
+
+# Test framework
+pytest==8.3.4
+pytest-cov==6.0.0
+pytest-mock==3.14.0
+
+# Optional: faster reruns
+pytest-xdist==3.6.1

@@ -5,8 +5,6 @@ import os
 import random
 import time
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-
 try:
     from langchain_openai import ChatOpenAI
 except Exception:
@@ -19,11 +17,8 @@ except Exception:
 
 from backend.core.config import (
     AI_PROVIDER,
-    GOOGLE_API_KEY,
-    OPENROUTER_API_KEY,
-    OPENROUTER_BASE_URL,
-    OPENROUTER_HTTP_REFERER,
-    OPENROUTER_APP_TITLE,
+    SUMOPOD_API_KEY,
+    SUMOPOD_BASE_URL,
     OLLAMA_BASE_URL,
 )
 
@@ -34,17 +29,9 @@ def build_llm(model: str, temperature: float, max_output_tokens: int):
     """Create chat model client with per-model provider auto-detection.
 
     Provider resolution order:
-    1. model starts with 'gemini'  -> Google
-    2. model contains '/'          -> OpenRouter  (e.g. stepfun/step-3.5-flash:free)
-    3. fallback to global AI_PROVIDER env variable
+    1. Check global AI_PROVIDER env variable (default to sumopod)
     """
-    model_lower = (model or "").lower()
-    if model_lower.startswith("gemini"):
-        provider = "google"
-    elif "/" in model_lower:
-        provider = "openrouter"
-    else:
-        provider = (AI_PROVIDER or "google").strip().lower()
+    provider = (AI_PROVIDER or "sumopod").strip().lower()
 
     if provider == "ollama":
         if ChatOllama is None:
@@ -56,40 +43,19 @@ def build_llm(model: str, temperature: float, max_output_tokens: int):
             base_url=OLLAMA_BASE_URL,
         )
 
-    if provider == "openrouter":
-        if ChatOpenAI is None:
-            raise RuntimeError("Dependency 'langchain-openai' belum terpasang")
-        if not OPENROUTER_API_KEY:
-            raise RuntimeError("OPENROUTER_API_KEY belum di-set")
+    # Default to SumoPod (OpenAI-compatible)
+    if ChatOpenAI is None:
+        raise RuntimeError("Dependency 'langchain-openai' belum terpasang")
+    if not SUMOPOD_API_KEY:
+        raise RuntimeError("SUMOPOD_API_KEY belum di-set")
 
-        headers = {}
-        if OPENROUTER_HTTP_REFERER:
-            headers["HTTP-Referer"] = OPENROUTER_HTTP_REFERER
-        if OPENROUTER_APP_TITLE:
-            headers["X-Title"] = OPENROUTER_APP_TITLE
-
-        kwargs = {
-            "model": model,
-            "temperature": temperature,
-            "max_tokens": max_output_tokens,
-            "api_key": OPENROUTER_API_KEY,
-            "base_url": OPENROUTER_BASE_URL,
-            "timeout": 120,
-        }
-        if headers:
-            kwargs["default_headers"] = headers
-        return ChatOpenAI(**kwargs)
-
-    # Google Gemini provider
-    if not GOOGLE_API_KEY:
-        raise RuntimeError("GOOGLE_API_KEY belum di-set")
-
-    return ChatGoogleGenerativeAI(
+    return ChatOpenAI(
         model=model,
         temperature=temperature,
-        max_output_tokens=max_output_tokens,
-        google_api_key=GOOGLE_API_KEY,
-        request_timeout=120,
+        max_tokens=max_output_tokens,
+        api_key=SUMOPOD_API_KEY,
+        base_url=SUMOPOD_BASE_URL,
+        timeout=120,
     )
 
 
@@ -97,14 +63,9 @@ def invoke_with_retry(llm, messages, *, retries: int = 3, backoff: float = 2.0):
     """Call llm.invoke with exponential-backoff retry on transient errors."""
     for attempt in range(1, retries + 1):
         try:
-            # Timeout dikonfigurasi di level client (mis. ChatOpenAI(timeout=...),
-            # ChatGoogleGenerativeAI(request_timeout=...)). Di sini jangan kirim
-            # argumen timeout tambahan karena tidak semua backend mendukungnya.
             return llm.invoke(messages)
         except Exception as exc:
             exc_str = str(exc).lower()
-            # Hanya pattern yang jelas-jelas transient; 500 di-skip untuk
-            # menghindari false positive berbasis string.
             retryable = any(tok in exc_str for tok in [
                 "429",
                 "rate limit",
@@ -130,3 +91,48 @@ def invoke_with_retry(llm, messages, *, retries: int = 3, backoff: float = 2.0):
                 wait,
             )
             time.sleep(wait)
+
+
+def stream_with_retry(llm, messages, *, retries: int = 3, backoff: float = 2.0):
+    """Stream tokens from llm.stream() with retry on transient errors.
+
+    Yields AIMessageChunk objects token by token.
+    Falls back to non-streaming invoke if stream is not supported.
+    """
+    for attempt in range(1, retries + 1):
+        try:
+            yield from llm.stream(messages)
+            return
+        except NotImplementedError:
+            # Provider doesn't support streaming – fall back to single invoke
+            response = invoke_with_retry(llm, messages, retries=retries, backoff=backoff)
+            yield response
+            return
+        except Exception as exc:
+            exc_str = str(exc).lower()
+            retryable = any(tok in exc_str for tok in [
+                "429",
+                "rate limit",
+                "502",
+                "503",
+                "overloaded",
+                "resource exhausted",
+                "quota",
+            ])
+            status_code = getattr(exc, "status_code", None)
+            if status_code == 500:
+                retryable = True
+
+            if not retryable or attempt == retries:
+                raise
+
+            wait = (backoff ** attempt) + random.uniform(0, 1)
+            logger.warning(
+                "LLM stream attempt %d/%d failed (%s), retrying in %.1fs",
+                attempt,
+                retries,
+                exc,
+                wait,
+            )
+            time.sleep(wait)
+

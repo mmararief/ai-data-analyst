@@ -14,7 +14,7 @@ router = APIRouter(prefix="/notebook", tags=["notebook"])
 
 
 class Part(BaseModel):
-    type: str  # 'text' | 'image' | 'plan' | 'task_start' | 'streamlit'
+    type: str  # 'text' | 'image' | 'plan' | 'task_start'
     content: Optional[str | list] = ""
     index: Optional[int] = None
     total: Optional[int] = None
@@ -134,10 +134,6 @@ def generate_notebook(req: NotebookRequest, user: UserInDB = Depends(get_current
             elif part.type == "image" and part.content:
                 pending_images.append(part.content)
 
-            elif part.type == "streamlit":
-                cells.append(_md_cell(_source_lines(
-                    f"*Dashboard Streamlit dibuat dari file `{part.content}`*"
-                )))
 
         # Now add code steps (with their outputs and any preceding images)
         for step in steps:

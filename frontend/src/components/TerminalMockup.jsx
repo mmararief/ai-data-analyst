@@ -8,7 +8,7 @@ const tabContents = {
     { type: 'comment', text: '# planner agent' },
     { type: 'fn', text: 'plan' }, { type: 'op', text: ' = [' },
     { type: '', text: '\u00A0 ' }, { type: 'op', text: '{' }, { type: 'key', text: '"task"' }, { type: 'op', text: ': ' }, { type: 'str', text: '"profiling dataset"' }, { type: 'op', text: ', ' }, { type: 'key', text: '"phase"' }, { type: 'op', text: ': ' }, { type: 'val', text: '0' }, { type: 'op', text: '},' },
-    { type: '', text: '\u00A0 ' }, { type: 'op', text: '{' }, { type: 'key', text: '"task"' }, { type: 'op', text: ': ' }, { type: 'str', text: '"train automl"' }, { type: 'op', text: ', ' }, { type: 'key', text: '"phase"' }, { type: 'op', text: ': ' }, { type: 'val', text: '1' }, { type: 'op', text: '},' },
+    { type: '', text: '\u00A0 ' }, { type: 'op', text: '{' }, { type: 'key', text: '"task"' }, { type: 'op', text: ': ' }, { type: 'str', text: '"analisis distribusi"' }, { type: 'op', text: ', ' }, { type: 'key', text: '"phase"' }, { type: 'op', text: ': ' }, { type: 'val', text: '1' }, { type: 'op', text: '},' },
     { type: 'op', text: ']' },
   ],
   executor: [
@@ -16,14 +16,14 @@ const tabContents = {
     { type: 'key', text: 'tasks' }, { type: 'op', text: ' = ' }, { type: 'fn', text: 'run_phase_parallel' }, { type: 'op', text: '(generators)' },
     { type: '', text: '\u00A0' },
     { type: 'comment', text: '# tool calls' },
-    { type: 'fn', text: 'automl_train_tool' }, { type: 'op', text: '(' },
-    { type: '', text: '\u00A0 ' }, { type: 'key', text: 'dataset_name' }, { type: 'op', text: '=' }, { type: 'str', text: '"customers.csv"' }, { type: 'op', text: ',' },
-    { type: '', text: '\u00A0 ' }, { type: 'key', text: 'target_column' }, { type: 'op', text: '=' }, { type: 'str', text: '"churn"' }, { type: 'op', text: ',' },
-    { type: '', text: '\u00A0 ' }, { type: 'key', text: 'problem_type' }, { type: 'op', text: '=' }, { type: 'str', text: '"classification"' },
+    { type: 'fn', text: 'python_repl_tool' }, { type: 'op', text: '(' },
+    { type: '', text: '\u00A0 ' }, { type: 'str', text: '"import pandas as pd"' }, { type: 'op', text: ',' },
+    { type: '', text: '\u00A0 ' }, { type: 'str', text: '"df = pd.read_csv(\'customers.csv\')"' }, { type: 'op', text: ',' },
+    { type: '', text: '\u00A0 ' }, { type: 'str', text: '"df.describe()"' },
     { type: 'op', text: ')' },
     { type: '', text: '\u00A0' },
-    { type: 'key', text: 'best_model' }, { type: 'op', text: ' = ' }, { type: 'val', text: '"LightGBM"' },
-    { type: 'key', text: 'accuracy' }, { type: 'op', text: '  = ' }, { type: 'val', text: '0.934' },
+    { type: 'key', text: 'rows' }, { type: 'op', text: '    = ' }, { type: 'val', text: '10,423' },
+    { type: 'key', text: 'columns' }, { type: 'op', text: ' = ' }, { type: 'val', text: '12' },
   ],
   critic: [
     { type: 'comment', text: '# critic agent evaluation' },
@@ -53,20 +53,20 @@ export default function TerminalMockup() {
   const [activeTab, setActiveTab] = useState('planner')
 
   return (
-    <div className="bg-[#080c16] border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-      <div className="bg-[#0a0e1a] px-5 py-3.5 flex items-center gap-2 border-b border-white/5">
-        <div className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]"></div>
-        <div className="w-2.5 h-2.5 rounded-full bg-[#febc2e]"></div>
-        <div className="w-2.5 h-2.5 rounded-full bg-[#28c840]"></div>
+    <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+      <div className="bg-slate-900 px-5 py-3.5 flex items-center gap-2 border-b border-slate-800">
+        <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+        <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
+        <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
         <span className="ml-2 font-mono text-[11px] text-[#64748b] tracking-wider uppercase">analisai · pipeline · live</span>
       </div>
-      <div className="flex border-b border-white/5 bg-black/20">
+      <div className="flex border-b border-slate-800 bg-slate-950">
         {Object.keys(tabContents).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-5 py-2.5 font-mono text-[11px] border-r border-white/5 transition-colors uppercase tracking-widest ${
-              activeTab === tab ? 'text-[#38bdf8] bg-sky-400/5' : 'text-[#64748b] hover:text-[#94a3b8]'
+            className={`px-5 py-2.5 font-mono text-[11px] border-r border-slate-800 transition-colors uppercase tracking-widest ${
+              activeTab === tab ? 'text-sky-400 bg-sky-900/10' : 'text-slate-500 hover:text-slate-400'
             }`}
           >
             {tab}
@@ -84,7 +84,7 @@ export default function TerminalMockup() {
           </div>
         ))}
         <div className="mt-1">
-          <span className="inline-block w-2 h-3.5 bg-[#38bdf8] align-bottom animate-pulse"></span>
+          <span className="inline-block w-2 h-3.5 bg-sky-400 align-bottom animate-pulse"></span>
         </div>
       </div>
     </div>

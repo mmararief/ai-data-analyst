@@ -25,7 +25,7 @@ from minio.error import S3Error
 try:
     from backend.core.config import (
         MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
-        MINIO_BUCKET, MINIO_SECURE,
+        MINIO_BUCKET, MINIO_SECURE, TEMP_ROOT
     )
 except ImportError:
     MINIO_ENDPOINT = "localhost:9000"
@@ -261,7 +261,7 @@ def sandbox_context(user_id: str, *, project_id: str | None = None):
     yield Path untuk sandbox, lalu upload file baru yang di-generate balik ke MinIO.
     Temp dir selalu di-cleanup.
     """
-    tmp = Path(tempfile.mkdtemp(prefix=f"sbx_{user_id[:8]}_"))
+    tmp = Path(tempfile.mkdtemp(prefix=f"sbx_{user_id[:8]}_", dir=str(TEMP_ROOT)))
     try:
         download_user_files(user_id, tmp, project_id=project_id)
         yield tmp

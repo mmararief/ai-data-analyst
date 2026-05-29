@@ -23,6 +23,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 venv/
+.venv/
 env/
 ENV/
 env.bak/
@@ -65,6 +66,8 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+temp/
+dataset_user/
 .cache/
 .pytest_cache/
 .mypy_cache/

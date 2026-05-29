@@ -3,7 +3,7 @@ import sys
 import time
 
 from backend.core.job_store import dequeue_job, finish_job
-from backend.worker_service import process_automl_job, process_job
+from backend.worker_service import JobPayloadError, process_job
 
 # Setup logging
 logging.basicConfig(
@@ -20,6 +20,14 @@ def _worker_loop() -> None:
     logger.info("=" * 60)
     logger.info("AI Data Analyst Worker Started")
     logger.info("=" * 60)
+    
+    # Cleanup any orphaned sandbox containers from previous runs
+    try:
+        from sandbox import cleanup_all_sandboxes
+        cleanup_all_sandboxes()
+    except Exception as e:
+        logger.warning(f"Gagal menjalankan cleanup awal: {e}")
+
     logger.info("Connecting to Redis queue...")
     logger.info("Waiting for jobs from queue:jobs...")
 
@@ -38,22 +46,25 @@ def _worker_loop() -> None:
 
         start = time.monotonic()
         try:
-            job_type = payload.get("type", "chat")
-            if job_type == "automl_train":
-                process_automl_job(payload)
-            else:
-                process_job(payload)
+            process_job(payload)
             elapsed = time.monotonic() - start
             logger.info(f"✅ Job {job_id} completed successfully in {elapsed:.1f}s")
+        except JobPayloadError as exc:
+            elapsed = time.monotonic() - start
+            # process_job already cleaned up Redis state for invalid payloads.
+            logger.error(
+                f"❌ Job {job_id} dropped after {elapsed:.1f}s (invalid payload): {exc}"
+            )
         except Exception as exc:
             elapsed = time.monotonic() - start
             logger.error(f"❌ Job {job_id} failed after {elapsed:.1f}s: {str(exc)}", exc_info=True)
-            # Pastikan status job di-update ke error agar frontend mendapat sinyal yang jelas
+            # process_job already calls finish_job(error=...) before re-raising,
+            # but we keep this defensive call as a fallback in case the failure
+            # happened *before* finish_job ran (e.g. import error).
             try:
                 if user_id != "unknown" and job_id != "unknown":
                     finish_job(user_id, job_id, error=str(exc))
             except Exception:
-                # Jangan biarkan error status-update mematikan worker loop
                 logger.warning("Gagal mengupdate status job setelah error", exc_info=True)
 
 
