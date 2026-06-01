@@ -278,18 +278,6 @@ export default function DashboardPage({ username, onLogout }) {
 
   return (
     <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
-        @keyframes fadeDown { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes spin { to{transform:rotate(360deg)} }
-        @keyframes floatUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-        .dash-create-btn:hover { transform:translateY(-1px); box-shadow:0 0 32px rgba(56,189,248,0.3),0 6px 20px rgba(0,0,0,0.4) !important; }
-        .dash-create-btn:active { transform:translateY(0); }
-        .dash-logout:hover { color:#94a3b8 !important; border-color:rgba(255,255,255,0.12) !important; }
-        .dash-theme-btn:hover { color:#38bdf8 !important; border-color:rgba(56,189,248,0.3) !important; }
-        .empty-create:hover { transform:translateY(-1px); box-shadow:0 0 28px rgba(56,189,248,0.25) !important; }
-      `}</style>
-
       <div style={{
         minHeight:'100vh',
         background:'var(--bg-page)',

@@ -42,6 +42,8 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
 
 # Docker
 .dockerignore
@@ -61,7 +63,8 @@ logs/
 *.swp
 *.swo
 *~
-.DS_Store
+# OS specific
+Thumbs.db
 
 # Temporary files
 *.tmp
@@ -90,10 +93,6 @@ redis-data/
 *.tar
 *.gz
 
-# OS specific
-Thumbs.db
-.DS_Store
-
 # Jupyter Notebook
 .ipynb_checkpoints
 
@@ -106,3 +105,7 @@ coverage.xml
 
 # Build artifacts
 *.whl
+
+# Duplicate/backup files
+* copy.*
+

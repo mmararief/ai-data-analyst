@@ -1,7 +1,7 @@
 // Thin orchestrator: routing, sidebar layout, and the wiring between
 // `useChatStream` (state + SSE) and the presentational chat components.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import api from '../api'
 import Sidebar from '../components/Sidebar'
@@ -9,6 +9,7 @@ import { useTheme } from '../ThemeContext'
 import ChatHeader from '../components/chat/ChatHeader'
 import ChatMessageList from '../components/chat/ChatMessageList'
 import ChatComposer from '../components/chat/ChatComposer'
+import ComputerPanel from '../components/chat/ComputerPanel'
 import { useChatStream } from '../hooks/useChatStream'
 
 export default function ChatPage({ username, onLogout }) {
@@ -22,6 +23,8 @@ export default function ChatPage({ username, onLogout }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(272)
   const [, setProjectName] = useState('') // currently unused in UI but fetched for future header use
+  const [panelVisible, setPanelVisible] = useState(false)
+  const [panelManuallyHidden, setPanelManuallyHidden] = useState(false)
   const resizingRef = useRef(false)
 
   const {
@@ -112,12 +115,60 @@ export default function ChatPage({ username, onLogout }) {
   const handleNewChat = () => {
     clearMessages()
     setSessionId(null)
+    setPanelVisible(false)
+    setPanelManuallyHidden(false)
   }
 
   const handleLoadHistory = (sid, msgs) => {
     if (loading) return
     loadMessages(msgs)
     setSessionId(sid)
+    setPanelVisible(false)
+    setPanelManuallyHidden(false)
+  }
+
+  // ── Computer panel logic ────────────────────────────────────────────────
+  // Determine the last assistant message to feed into the panel.
+  const lastAssistantMsg = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') return messages[i]
+    }
+    return null
+  }, [messages])
+
+  // Has tool calls worth showing in panel?
+  const hasPanelContent = useMemo(() => {
+    if (!lastAssistantMsg) return false
+    const parts = lastAssistantMsg.parts || []
+    return parts.some(p =>
+      p.type === 'code_step' || p.type === 'task_start' || p.type === 'agent_label'
+    )
+  }, [lastAssistantMsg])
+
+  // Auto-show panel when AI starts producing tool calls.
+  useEffect(() => {
+    if (loading && hasPanelContent && !panelManuallyHidden) {
+      setPanelVisible(true)
+    }
+  }, [loading, hasPanelContent, panelManuallyHidden])
+
+  // Reset manual-hide flag when a new message cycle starts.
+  useEffect(() => {
+    if (loading) setPanelManuallyHidden(false)
+  }, [loading])
+
+  const handleClosePanel = () => {
+    setPanelVisible(false)
+    setPanelManuallyHidden(true)
+  }
+
+  const handleTogglePanel = () => {
+    if (panelVisible) {
+      handleClosePanel()
+    } else {
+      setPanelVisible(true)
+      setPanelManuallyHidden(false)
+    }
   }
 
   return (
@@ -222,18 +273,38 @@ export default function ChatPage({ username, onLogout }) {
             theme={theme}
             onToggleTheme={toggleTheme}
             onLogout={onLogout}
+            panelVisible={panelVisible}
+            hasPanelContent={hasPanelContent}
+            onTogglePanel={handleTogglePanel}
           />
 
-          <ChatMessageList
-            messages={messages}
-            loading={loading}
-            statusText={statusText}
-            username={username}
-            projectId={projectId}
-            onApprovePlan={approvePlan}
-            onSelectOption={selectOption}
-            onSubmitClarification={submitClarification}
-          />
+          {/* Split area: chat + computer panel */}
+          <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+            {/* Chat messages column */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+              <ChatMessageList
+                messages={messages}
+                loading={loading}
+                statusText={statusText}
+                username={username}
+                projectId={projectId}
+                onApprovePlan={approvePlan}
+                onSelectOption={selectOption}
+                onSubmitClarification={submitClarification}
+                computerPanelOpen={panelVisible}
+              />
+            </div>
+
+            {/* Computer panel (right side) */}
+            {panelVisible && hasPanelContent && (
+              <ComputerPanel
+                message={lastAssistantMsg}
+                loading={loading}
+                statusText={statusText}
+                onClose={handleClosePanel}
+              />
+            )}
+          </div>
 
           <ChatComposer
             loading={loading}

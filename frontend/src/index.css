@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -195,6 +194,15 @@ body {
   box-shadow: 0 0 30px rgba(56, 189, 248, 0.05);
 }
 
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Smooth scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -228,4 +236,60 @@ body {
 }
 .animate-slide-in-bottom {
   animation: slideInBottom 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ═══════════════════════════════════════════════
+   Computer Panel (Kimi-style side panel)
+   ═══════════════════════════════════════════════ */
+
+@keyframes panelSlideIn {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes panelSlideOut {
+  from { opacity: 1; transform: translateX(0); }
+  to   { opacity: 0; transform: translateX(24px); }
+}
+.computer-panel-enter {
+  animation: panelSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.computer-panel-exit {
+  animation: panelSlideOut 0.25s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* Panel scrollbar */
+.panel-scroll::-webkit-scrollbar { width: 3px; }
+.panel-scroll::-webkit-scrollbar-track { background: transparent; }
+.panel-scroll::-webkit-scrollbar-thumb { background: rgba(168,199,250,0.15); border-radius: 2px; }
+.panel-scroll::-webkit-scrollbar-thumb:hover { background: rgba(168,199,250,0.3); }
+
+/* Step card pulse for active step */
+@keyframes stepPulse {
+  0%, 100% { border-color: rgba(56,189,248,0.25); }
+  50% { border-color: rgba(56,189,248,0.5); }
+}
+.step-active {
+  animation: stepPulse 2s ease-in-out infinite;
+}
+
+/* Progress bar animation */
+@keyframes progressSlide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.progress-slide {
+  animation: progressSlide 1.5s ease-in-out infinite;
+}
+
+/* Panel step hover */
+.panel-step:hover {
+  background: var(--bg-hover);
+}
+
+/* Mobile: toggle tab for panel */
+@media (max-width: 768px) {
+  .computer-panel-desktop { display: none !important; }
+}
+@media (min-width: 769px) {
+  .computer-panel-mobile-tab { display: none !important; }
 }

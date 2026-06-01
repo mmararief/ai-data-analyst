@@ -43,7 +43,7 @@ function TypingIndicator() {
   )
 }
 
-export default function MessageBubble({ message, isLoading, statusText, allMessages, projectId, isLastMessage, onApprovePlan, onSelectOption, onSubmitClarification }) {
+export default function MessageBubble({ message, isLoading, statusText, allMessages, projectId, isLastMessage, onApprovePlan, onSelectOption, onSubmitClarification, computerPanelOpen }) {
   const isUser = message.role === 'user'
   const isEmpty = !message.parts?.length && !message.codeSteps?.length
   const [nbLoading, setNbLoading] = useState(false)
@@ -179,6 +179,20 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
                         onSelectOption={onSelectOption}
                         onSubmitClarification={onSubmitClarification}
                       />
+                    ) : computerPanelOpen ? (
+                      /* Simplified tool call indicator when panel is open */
+                      <div key={i} className="flex items-center gap-2 py-1.5 px-2 my-1 rounded-md" style={{
+                        background: 'var(--bg-hover)',
+                        border: '1px solid var(--border-light)',
+                      }}>
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#38bdf8">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        <span className="text-[11px]" style={{ color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+                          {item.value.length} langkah analisis
+                        </span>
+                        <span className="text-[10px]" style={{ color: 'rgba(56,189,248,0.6)' }}>→ Panel Komputer</span>
+                      </div>
                     ) : (
                       <ToolCallGroup
                         key={i}

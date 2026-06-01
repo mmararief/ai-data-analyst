@@ -602,5 +602,5 @@ def create_agent(
     return create_react_agent(
         llm,
         tools=tool_list,
-        prompt=prompt,
+        messages_modifier=prompt,
     )

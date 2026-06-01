@@ -65,3 +65,6 @@ MAX_HISTORY_CONTENT_LEN: int = int(os.environ.get("MAX_HISTORY_CONTENT_LEN", "20
 MAX_UPLOAD_MB: int = int(os.environ.get("MAX_UPLOAD_MB", "25"))
 MAX_UPLOAD_FILES: int = int(os.environ.get("MAX_UPLOAD_FILES", "20"))
 CHAT_MAX_WORKERS: int = int(os.environ.get("CHAT_MAX_WORKERS", "4"))
+
+# CORS
+ALLOWED_ORIGINS: list[str] = os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:80").split(",")

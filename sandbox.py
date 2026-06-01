@@ -1,5 +1,6 @@
 import docker
 import os
+import re
 import threading
 import time
 import json
@@ -13,6 +14,39 @@ except ImportError:
     SANDBOX_TIMEOUT = 120
     SANDBOX_MEM_LIMIT = "512m"
     SANDBOX_CPU_QUOTA = 100000
+
+_ALLOWED_IMPORTS = {
+    "pandas", "numpy", "matplotlib", "seaborn", "plotly",
+    "scipy", "statsmodels", "sklearn", "scikit-learn",
+    "openpyxl", "xlrd", "json", "math", "datetime",
+    "collections", "itertools", "functools", "re",
+    "io", "pathlib", "typing", "warnings", "textwrap",
+    "sqlalchemy", "pymysql", "sqlparse",
+}
+_BLOCKED_PATTERNS = [
+    r"\bos\.(?:system|popen|exec|spawn|remove|rmdir|rename|replace|chmod|chown|kill|getenv|environ)\b",
+    r"\bsubprocess\b",
+    r"\b__import__\b",
+    r"\bimport\s+(?:subprocess|shutil|socket|http|urllib|requests|ctypes)\b",
+    r"\bfrom\s+(?:subprocess|shutil|socket|http|urllib|requests|ctypes)\s+import\b",
+    r"\bopen\s*\([^)]*['\"]w",
+    r"\beval\b",
+    r"\bcompile\b",
+    r"\bglobals\s*\(\s*\)",
+    r"\blocals\s*\(\s*\)",
+    r"\bgetattr\s*\(",
+    r"\bsetattr\s*\(",
+    r"\bdelattr\s*\(",
+    r"\b__builtins__\b",
+    r"\bexecfile\b",
+    r"\breload\b",
+]
+
+def _validate_code(code: str) -> str | None:
+    for pattern in _BLOCKED_PATTERNS:
+        if re.search(pattern, code):
+            return f"Kode mengandung pola yang tidak diizinkan: {pattern}"
+    return None
 
 _active_containers = {}
 _sandbox_locks = {}
@@ -171,6 +205,11 @@ def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str):
     absolute_data_path = os.path.abspath(data_folder_path)
     lock = _get_lock(absolute_data_path)
     
+    validation_error = _validate_code(ai_generated_code)
+    if validation_error:
+        yield f"\nError: {validation_error}\n"
+        return
+
     with lock:
         try:
             _ensure_sandbox_started(absolute_data_path)

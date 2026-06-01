@@ -13,6 +13,7 @@ export default function ChatMessageList({
   onApprovePlan,
   onSelectOption,
   onSubmitClarification,
+  computerPanelOpen,
 }) {
   const scrollAreaRef = useRef(null)
   const bottomRef = useRef(null)
@@ -83,6 +84,7 @@ export default function ChatMessageList({
             onApprovePlan={onApprovePlan}
             onSelectOption={onSelectOption}
             onSubmitClarification={onSubmitClarification}
+            computerPanelOpen={computerPanelOpen && i === messages.length - 1}
           />
         ))}
         <div ref={bottomRef} />

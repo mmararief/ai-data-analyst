@@ -1,4 +1,51 @@
+x-shared-env: &shared-env
+  APP_ENV: ${APP_ENV:-development}
+  SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env}
+  MYSQL_URL: mysql+pymysql://${MYSQL_USER:-analyst}:${MYSQL_PASSWORD:-analyst_password}@mysql:3306/${MYSQL_DATABASE:-ai_analyst}
+  REDIS_URL: redis://redis:6379/0
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
+  MINIO_BUCKET: ${MINIO_BUCKET:-ai-datasets}
+  MINIO_SECURE: "false"
+  AI_PROVIDER: ${AI_PROVIDER:-sumopod}
+  SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
+  SUMOPOD_BASE_URL: ${SUMOPOD_BASE_URL:-https://ai.sumopod.com/v1}
+  MODEL_CHAT: ${MODEL_CHAT:-gpt-4o-mini}
+  MODEL_DEEP: ${MODEL_DEEP:-}
+  MODEL_PLANNER: ${MODEL_PLANNER:-}
+  MODEL_EXECUTOR: ${MODEL_EXECUTOR:-}
+  MODEL_CRITIC: ${MODEL_CRITIC:-}
+  OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+  MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+  MAX_UPLOAD_FILES: ${MAX_UPLOAD_FILES:-20}
+  CHAT_MAX_WORKERS: ${CHAT_MAX_WORKERS:-4}
+  MAX_HISTORY_MESSAGES: ${MAX_HISTORY_MESSAGES:-10}
+  MAX_HISTORY_CONTENT_LEN: ${MAX_HISTORY_CONTENT_LEN:-2000}
+  DOCKER_HOST: tcp://docker-proxy:2375
+
+x-worker-env: &worker-env
+  SANDBOX_TIMEOUT: ${SANDBOX_TIMEOUT:-120}
+  SANDBOX_MEM_LIMIT: ${SANDBOX_MEM_LIMIT:-512m}
+  SANDBOX_CPU_QUOTA: ${SANDBOX_CPU_QUOTA:-100000}
+
 services:
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.2
+    container_name: ai_analyst_docker_proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      NETWORKS: 0
+      VOLUMES: 0
+      POST: 1
+      EXEC: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - backend
+
   api:
     build:
       context: .
@@ -7,45 +54,20 @@ services:
     restart: unless-stopped
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     environment:
-      APP_ENV: ${APP_ENV:-development}
-      SECRET_KEY: ${SECRET_KEY:-changeme-super-secret-key}
-      # Database
-      MYSQL_URL: mysql+pymysql://${MYSQL_USER:-analyst}:${MYSQL_PASSWORD:-analyst_password}@mysql:3306/${MYSQL_DATABASE:-ai_analyst}
-      REDIS_URL: redis://redis:6379/0
-      # MinIO
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
-      MINIO_BUCKET: ${MINIO_BUCKET:-ai-datasets}
-      MINIO_SECURE: "false"
-      # AI Provider
-      AI_PROVIDER: ${AI_PROVIDER:-sumopod}
-      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
-      SUMOPOD_BASE_URL: ${SUMOPOD_BASE_URL:-https://ai.sumopod.com/v1}
-      MODEL_CHAT: ${MODEL_CHAT:-gpt-4o-mini}
-      MODEL_DEEP: ${MODEL_DEEP:-}
-      MODEL_PLANNER: ${MODEL_PLANNER:-}
-      MODEL_EXECUTOR: ${MODEL_EXECUTOR:-}
-      MODEL_CRITIC: ${MODEL_CRITIC:-}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      # Runtime limits
-      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
-      MAX_UPLOAD_FILES: ${MAX_UPLOAD_FILES:-20}
-      CHAT_MAX_WORKERS: ${CHAT_MAX_WORKERS:-4}
-      MAX_HISTORY_MESSAGES: ${MAX_HISTORY_MESSAGES:-10}
-      MAX_HISTORY_CONTENT_LEN: ${MAX_HISTORY_CONTENT_LEN:-2000}
+      <<: [*shared-env]
     ports:
       - "8000:8000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp:/tmp
     depends_on:
+      docker-proxy:
+        condition: service_started
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
       minio:
         condition: service_healthy
+    networks:
+      - backend
 
   worker:
     build:
@@ -54,61 +76,34 @@ services:
     restart: unless-stopped
     command: python -m backend.worker_main
     environment:
-      APP_ENV: ${APP_ENV:-development}
-      SECRET_KEY: ${SECRET_KEY:-changeme-super-secret-key}
-      # Database
-      MYSQL_URL: mysql+pymysql://${MYSQL_USER:-analyst}:${MYSQL_PASSWORD:-analyst_password}@mysql:3306/${MYSQL_DATABASE:-ai_analyst}
-      REDIS_URL: redis://redis:6379/0
-      # MinIO
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin123}
-      MINIO_BUCKET: ${MINIO_BUCKET:-ai-datasets}
-      MINIO_SECURE: "false"
-      # AI Provider
-      AI_PROVIDER: ${AI_PROVIDER:-sumopod}
-      SUMOPOD_API_KEY: ${SUMOPOD_API_KEY:-}
-      SUMOPOD_BASE_URL: ${SUMOPOD_BASE_URL:-https://ai.sumopod.com/v1}
-      MODEL_CHAT: ${MODEL_CHAT:-gpt-4o-mini}
-      MODEL_DEEP: ${MODEL_DEEP:-}
-      MODEL_PLANNER: ${MODEL_PLANNER:-}
-      MODEL_EXECUTOR: ${MODEL_EXECUTOR:-}
-      MODEL_CRITIC: ${MODEL_CRITIC:-}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      # Sandbox limits
-      SANDBOX_TIMEOUT: ${SANDBOX_TIMEOUT:-120}
-      SANDBOX_MEM_LIMIT: ${SANDBOX_MEM_LIMIT:-512m}
-      SANDBOX_CPU_QUOTA: ${SANDBOX_CPU_QUOTA:-100000}
-      # Runtime limits
-      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
-      MAX_UPLOAD_FILES: ${MAX_UPLOAD_FILES:-20}
-      CHAT_MAX_WORKERS: ${CHAT_MAX_WORKERS:-4}
-      MAX_HISTORY_MESSAGES: ${MAX_HISTORY_MESSAGES:-10}
-      MAX_HISTORY_CONTENT_LEN: ${MAX_HISTORY_CONTENT_LEN:-2000}
+      <<: [*shared-env, *worker-env]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp:/tmp
     depends_on:
+      docker-proxy:
+        condition: service_started
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
       minio:
         condition: service_healthy
+    networks:
+      - backend
 
   mysql:
     image: mysql:8.0
     container_name: ai_analyst_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-ai_analyst}
       MYSQL_USER: ${MYSQL_USER:-analyst}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-analyst_password}
-    ports:
-      - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
     healthcheck:
       test:
         [
@@ -119,26 +114,30 @@ services:
           "localhost",
           "-u",
           "root",
-          "-p${MYSQL_ROOT_PASSWORD:-root_password}",
+          "-p${MYSQL_ROOT_PASSWORD}",
         ]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
 
   redis:
     image: redis:7-alpine
     container_name: ai_analyst_redis
     restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+    networks:
+      - backend
 
   minio:
     image: minio/minio:latest
@@ -158,8 +157,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - backend
 
 volumes:
   mysql_data:
   redis_data:
   minio_data:
+
+networks:
+  backend:
+    driver: bridge

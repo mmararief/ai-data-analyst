@@ -41,13 +41,18 @@ _SKIP_PREFIXES = ("_chart_",)
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
 
+_CLIENT: Minio | None = None
+
 def _get_client() -> Minio:
-    return Minio(
-        MINIO_ENDPOINT,
-        access_key=MINIO_ACCESS_KEY,
-        secret_key=MINIO_SECRET_KEY,
-        secure=MINIO_SECURE,
-    )
+    global _CLIENT
+    if _CLIENT is None:
+        _CLIENT = Minio(
+            MINIO_ENDPOINT,
+            access_key=MINIO_ACCESS_KEY,
+            secret_key=MINIO_SECRET_KEY,
+            secure=MINIO_SECURE,
+        )
+    return _CLIENT
 
 
 def _ensure_bucket(client: Minio) -> None:
@@ -250,7 +255,7 @@ def upload_generated_files(
             continue
         rel = f.relative_to(source_dir).as_posix()
         obj_name = f"{prefix}{rel}"
-        if obj_name not in existing or f.suffix == '.pkl':
+        if obj_name not in existing:
             client.fput_object(MINIO_BUCKET, obj_name, str(f))
 
 

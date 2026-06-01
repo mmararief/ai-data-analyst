@@ -12,6 +12,9 @@ export default function ChatHeader({
   theme,
   onToggleTheme,
   onLogout,
+  panelVisible,
+  hasPanelContent,
+  onTogglePanel,
 }) {
   return (
     <header style={{
@@ -57,7 +60,33 @@ export default function ChatHeader({
         )}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        {/* Computer Panel toggle */}
+        {hasPanelContent && (
+          <button
+            onClick={onTogglePanel}
+            style={{
+              height: 30, borderRadius: 7,
+              background: panelVisible ? 'rgba(56,189,248,0.1)' : 'transparent',
+              border: panelVisible ? '1px solid rgba(56,189,248,0.25)' : '1px solid transparent',
+              color: panelVisible ? '#38bdf8' : 'var(--text-muted)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+              cursor: 'pointer', transition: 'all 0.2s',
+              padding: '0 10px',
+              fontSize: '11px',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+            onMouseEnter={e => { if (!panelVisible) { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)' } }}
+            onMouseLeave={e => { if (!panelVisible) { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent' } }}
+            title={panelVisible ? 'Sembunyikan Panel Komputer' : 'Tampilkan Panel Komputer'}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            Computer
+          </button>
+        )}
+
         <button
           onClick={onToggleTheme}
           style={{

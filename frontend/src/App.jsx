@@ -4,11 +4,7 @@ import HomePage from './pages/HomePage'
 import AuthPage from './pages/AuthPage'
 import DashboardPage from './pages/DashboardPage'
 import ChatPage from './pages/ChatPage'
-
-function AuthGuard({ children, isAuthenticated }) {
-  if (!isAuthenticated) return <Navigate to="/login" replace />
-  return children
-}
+import AuthGuard from './components/AuthGuard'
 
 function HomeWrapper() {
   const navigate = useNavigate()

@@ -39,8 +39,13 @@ def _install_sandbox_stub() -> None:
         """Test stub: yields nothing instead of streaming Docker output."""
         return iter(())
 
+    def cleanup_sandbox(*args, **kwargs):  # noqa: D401
+        """Test stub: no-op cleanup."""
+        pass
+
     stub.run_ai_code_securely = run_ai_code_securely
     stub.stream_ai_code_securely = stream_ai_code_securely
+    stub.cleanup_sandbox = cleanup_sandbox
     sys.modules["sandbox"] = stub
 
 
