@@ -182,9 +182,23 @@ def run_agent_stream(
                         
                 messages.append(("human", t))
 
+                import uuid
+                # Use deterministic session ID for persistence during this run
+                thread_id = str(uuid.uuid5(uuid.NAMESPACE_OID, str(data_folder)))
+                config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 40}
+
+                # Check if we already have state for this thread_id
+                state = ag.get_state(config)
+                if not state.values.get("messages"):
+                    # First time this session is running, initialize checkpointer with trimmed history + new question
+                    input_messages = messages
+                else:
+                    # History already in checkpointer, only append the new question
+                    input_messages = [("human", t)]
+
                 for stream_mode, chunk in ag.stream(
-                    {"messages": messages},
-                    {"recursion_limit": 40},
+                    {"messages": input_messages},
+                    config,
                     stream_mode=["messages", "updates"]
                 ):
                     if stream_mode == "messages":
