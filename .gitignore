@@ -109,3 +109,4 @@ coverage.xml
 # Duplicate/backup files
 * copy.*
 
+.venv-py312/
