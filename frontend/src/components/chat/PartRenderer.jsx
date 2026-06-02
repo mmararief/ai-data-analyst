@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { mdComponents } from './mdComponents'
 
 import CriticCard from './CriticCard'
 import ClarificationCard from './ClarificationCard'
+import DashboardViewer from './DashboardViewer'
 
 function stripThinking(text) {
   if (typeof text !== 'string') return text
@@ -11,6 +13,7 @@ function stripThinking(text) {
 }
 
 export default function PartRenderer({ part, index, openInsights, toggleInsight, isLoading, projectId, isLastMessage, onApprovePlan, onSelectOption, onSubmitClarification }) {
+  const [showDashboard, setShowDashboard] = useState(false)
   if (part.type === 'error') {
     return (
       <div key={index} className="flex items-start gap-2.5 p-3 rounded-lg border border-[var(--error)]/30 bg-[var(--error)]/5 my-2">
@@ -131,8 +134,10 @@ export default function PartRenderer({ part, index, openInsights, toggleInsight,
       </div>
     )
   } else if (part.type === 'file_export') {
+    const isDashboard = part.filename && (part.filename === 'dashboard.json' || part.filename.endsWith('dashboard.json'))
+
     const formatIcons = {
-      ipynb: '📓', csv: '📊', xlsx: '📊', md: '📝', html: '🌐', txt: '📄',
+      ipynb: '📓', csv: '📊', xlsx: '📊', md: '📝', html: '🌐', txt: '📄', json: '⚙️'
     }
     const formatColors = {
       ipynb: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
@@ -141,29 +146,109 @@ export default function PartRenderer({ part, index, openInsights, toggleInsight,
       md: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
       html: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
       txt: 'text-gray-400 bg-gray-500/10 border-gray-500/20',
+      json: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
     }
     const icon = formatIcons[part.format] || '📄'
     const colorCls = formatColors[part.format] || 'text-[var(--text-muted)] bg-[var(--bg-hover)] border-[var(--border-light)]'
     const sizeStr = part.size_bytes ? `${(part.size_bytes / 1024).toFixed(1)} KB` : ''
+
+    const handleDownload = () => {
+      const token = localStorage.getItem('token')
+      fetch(`/datasets/${projectId}/download/${encodeURIComponent(part.filename)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(r => r.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = part.filename
+          a.click()
+          URL.revokeObjectURL(url)
+        })
+        .catch(() => alert('Gagal mengunduh file'))
+    }
+
+    if (isDashboard) {
+      return (
+        <div key={index} className="my-3 block max-w-lg">
+          <div className="relative overflow-hidden rounded-2xl border border-[var(--border-primary)] bg-[var(--bg-card)] p-5 shadow-sm transition-all hover:border-[var(--analisai-cyan)]/30 hover:shadow-md">
+            <div className="flex items-start gap-4">
+              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-[var(--bg-hover)] border border-[var(--border-light)] text-[var(--analisai-cyan)] select-none shrink-0">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+                </svg>
+              </div>
+              <div className="flex-1 space-y-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-0.5 text-[9px] tracking-wider uppercase font-bold bg-[var(--bg-hover)] text-[var(--analisai-cyan)] rounded border border-[var(--border-light)] font-mono">
+                    Dashboard Interaktif
+                  </span>
+                </div>
+                <h4 className="text-sm font-bold text-[var(--text-heading)] truncate font-sans">{part.filename}</h4>
+                <p className="text-[11.5px] text-[var(--text-secondary)] leading-relaxed font-sans">
+                  AI berhasil mengekspor data konfigurasi dashboard. Klik tombol di bawah untuk membukanya secara interaktif.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3.5 border-t border-[var(--border-light)] flex items-center justify-between">
+              <button
+                onClick={() => setShowDashboard(true)}
+                className="px-4 py-2 bg-[var(--analisai-cyan)] text-white dark:text-[#131314] hover:opacity-90 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer flex items-center gap-1.5"
+              >
+                <span>Buka Dashboard</span>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </button>
+
+              <button
+                onClick={handleDownload}
+                className="p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors cursor-pointer"
+                title="Download JSON Config"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {showDashboard && (
+            <DashboardViewer
+              projectId={projectId}
+              filename={part.filename}
+              onClose={() => setShowDashboard(false)}
+            />
+          )}
+        </div>
+      )
+    }
 
     return (
       <div key={index} className="my-2 inline-flex items-center gap-3 px-4 py-2.5 border border-[var(--border-primary)] rounded-lg bg-[var(--bg-tertiary)]/20 shadow-sm">
         <div className={`flex items-center justify-center w-8 h-8 rounded-md border text-base ${colorCls}`}>
           {icon}
         </div>
-        <div>
+        <div className="flex-1">
           <div className="text-[12.5px] font-bold text-[var(--text-heading)]">
             {part.filename}
           </div>
-          <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-2">
-            <span className="uppercase tracking-wider">{part.format}</span>
+          <div className="text-[10px] text-[var(--text-muted)] flex items-center gap-2 mt-0.5">
+            <span className="uppercase tracking-wider font-semibold text-[var(--text-primary)]">{part.format}</span>
             {sizeStr && <span>· {sizeStr}</span>}
-            <span>· Tersedia di sidebar</span>
           </div>
         </div>
-        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-400">
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>
-        </div>
+        <button
+          onClick={handleDownload}
+          className="flex items-center justify-center p-2 rounded-md hover:bg-[var(--bg-hover)] text-[var(--analisai-cyan)] transition-colors"
+          title="Download File"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+          </svg>
+        </button>
       </div>
     )
   } else if (part.type === 'image') {

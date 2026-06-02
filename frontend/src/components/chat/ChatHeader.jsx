@@ -1,6 +1,7 @@
 // Top header for the chat page: collapse-burger when sidebar is hidden,
 // title, status pill, theme toggle, and user avatar.
 
+import { useNavigate } from 'react-router-dom'
 import StatusBadge from './StatusBadge'
 
 export default function ChatHeader({
@@ -15,7 +16,13 @@ export default function ChatHeader({
   panelVisible,
   hasPanelContent,
   onTogglePanel,
+  hasTodoWidget,
+  todoVisible,
+  onToggleTodo,
+  todoProgress,
 }) {
+  const navigate = useNavigate()
+
   return (
     <header style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -53,6 +60,29 @@ export default function ChatHeader({
           Analisai
         </span>
 
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            height: 30, borderRadius: 7,
+            background: 'transparent', border: '1px solid var(--border-primary)',
+            color: 'var(--text-muted)',
+            display: 'flex', alignItems: 'center', gap: '0.4rem',
+            cursor: 'pointer', transition: 'all 0.2s',
+            padding: '0 10px',
+            fontSize: '11px',
+            fontFamily: "'JetBrains Mono', monospace",
+            marginLeft: '0.5rem',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)' }}
+          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent' }}
+          title="Kembali ke Dashboard"
+        >
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+          Dashboard
+        </button>
+
         {loading && (
           <div style={{ marginLeft: '1rem' }}>
             <StatusBadge text={statusText} />
@@ -61,6 +91,32 @@ export default function ChatHeader({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        {/* To-Do List toggle */}
+        {hasTodoWidget && (
+          <button
+            onClick={onToggleTodo}
+            style={{
+              height: 30, borderRadius: 7,
+              background: todoVisible ? 'rgba(16,185,129,0.1)' : 'transparent',
+              border: todoVisible ? '1px solid rgba(16,185,129,0.25)' : '1px solid transparent',
+              color: todoVisible ? '#10b981' : 'var(--text-muted)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
+              cursor: 'pointer', transition: 'all 0.2s',
+              padding: '0 10px',
+              fontSize: '11px',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+            onMouseEnter={e => { if (!todoVisible) { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)' } }}
+            onMouseLeave={e => { if (!todoVisible) { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = 'transparent' } }}
+            title={todoVisible ? 'Sembunyikan To-Do List' : 'Tampilkan To-Do List'}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            </svg>
+            To-Do List ({todoProgress}%)
+          </button>
+        )}
+
         {/* Computer Panel toggle */}
         {hasPanelContent && (
           <button
@@ -86,40 +142,6 @@ export default function ChatHeader({
             Computer
           </button>
         )}
-
-        <button
-          onClick={onToggleTheme}
-          style={{
-            width: 32, height: 32, borderRadius: 7,
-            background: 'transparent', border: 'none',
-            color: 'var(--text-muted)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', transition: 'color 0.2s',
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = 'var(--text-secondary)'}
-          onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
-          title={theme === 'dark' ? 'Ganti ke Terang' : 'Ganti ke Gelap'}
-        >
-          {theme === 'dark' ? (
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-          ) : (
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
-          )}
-        </button>
-
-        <div
-          style={{
-            width: 32, height: 32, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 14, fontWeight: 800, color: 'white',
-            cursor: 'pointer',
-          }}
-          title="Keluar"
-          onClick={onLogout}
-        >
-          {username ? username.charAt(0).toUpperCase() : 'A'}
-        </div>
       </div>
     </header>
   )

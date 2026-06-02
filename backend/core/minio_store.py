@@ -34,8 +34,8 @@ except ImportError:
     MINIO_BUCKET = "ai-datasets"
     MINIO_SECURE = False
 
-_RUNTIME_SKIP_NAMES = {"_exec_script.py", ".chats.json"}
-_LIST_SKIP_NAMES = {"_exec_script.py", ".chats.json", "_schema.json"}
+_RUNTIME_SKIP_NAMES = {"_exec_script.py", "_kernel_loop.py", ".chats.json"}
+_LIST_SKIP_NAMES = {"_exec_script.py", "_kernel_loop.py", ".chats.json", "_schema.json"}
 _SKIP_PREFIXES = ("_chart_",)
 
 
@@ -230,23 +230,16 @@ def download_user_files(
 def upload_generated_files(
     user_id: str,
     source_dir: Path,
+    before_state: dict[str, tuple[float, int]] = None,
     *,
     project_id: str | None = None,
 ) -> None:
     """
-    Upload file yang baru di-generate di source_dir kembali ke MinIO.
-    Hanya upload file yang belum ada di MinIO sebelum sandbox run.
+    Upload file yang baru di-generate atau dimodifikasi di source_dir kembali ke MinIO.
     """
     client = _get_client()
     _ensure_bucket(client)
     prefix = _user_prefix(user_id, project_id)
-
-    existing: set[str] = set()
-    try:
-        for obj in client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=True):
-            existing.add(obj.object_name)
-    except S3Error:
-        pass
 
     for f in source_dir.rglob("*"):
         if not f.is_file():
@@ -255,7 +248,16 @@ def upload_generated_files(
             continue
         rel = f.relative_to(source_dir).as_posix()
         obj_name = f"{prefix}{rel}"
-        if obj_name not in existing:
+
+        is_changed = True
+        if before_state is not None and rel in before_state:
+            old_mtime, old_size = before_state[rel]
+            new_mtime = f.stat().st_mtime
+            new_size = f.stat().st_size
+            if new_size == old_size and new_mtime == old_mtime:
+                is_changed = False
+
+        if is_changed:
             client.fput_object(MINIO_BUCKET, obj_name, str(f))
 
 
@@ -263,13 +265,50 @@ def upload_generated_files(
 def sandbox_context(user_id: str, *, project_id: str | None = None):
     """
     Context manager: download file user dari MinIO ke temp dir,
-    yield Path untuk sandbox, lalu upload file baru yang di-generate balik ke MinIO.
+    yield Path untuk sandbox, lalu upload file baru/modified yang di-generate balik ke MinIO.
     Temp dir selalu di-cleanup.
     """
     tmp = Path(tempfile.mkdtemp(prefix=f"sbx_{user_id[:8]}_", dir=str(TEMP_ROOT)))
     try:
         download_user_files(user_id, tmp, project_id=project_id)
+        # Pastikan folder exports selalu ada agar kode python yang menulis ke sana tidak error
+        (tmp / "exports").mkdir(exist_ok=True)
+
+        # Rekam status file sebelum eksekusi sandbox
+        before_state = {}
+        for f in tmp.rglob("*"):
+            if f.is_file():
+                try:
+                    stat = f.stat()
+                    before_state[f.relative_to(tmp).as_posix()] = (stat.st_mtime, stat.st_size)
+                except Exception:
+                    pass
+
         yield tmp
-        upload_generated_files(user_id, tmp, project_id=project_id)
+        upload_generated_files(user_id, tmp, before_state, project_id=project_id)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def list_all_project_files(user_id: str, project_id: str) -> list[dict]:
+    """Daftar seluruh file milik user dalam project secara rekursif."""
+    client = _get_client()
+    _ensure_bucket(client)
+    prefix = _user_prefix(user_id, project_id)
+    items = []
+    try:
+        for obj in client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=True):
+            rel = obj.object_name[len(prefix):]
+            if not rel or obj.is_dir:
+                continue
+            if _is_list_hidden(Path(rel).name):
+                continue
+            items.append({
+                "name": Path(rel).name,
+                "path": rel,
+                "size_kb": round((obj.size or 0) / 1024, 1),
+                "type": "file",
+            })
+    except S3Error:
+        pass
+    return items

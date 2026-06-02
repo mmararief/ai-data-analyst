@@ -94,15 +94,6 @@ function ProjectCard({ project, index, onNavigate, onEdit, onDelete }) {
         transition:'background 0.3s',
       }} />
 
-      {/* Corner glow */}
-      <div style={{
-        position:'absolute', top:-40, right:-40,
-        width:120, height:120, borderRadius:'50%',
-        background: `radial-gradient(circle, ${accent}10 0%, transparent 70%)`,
-        opacity: hovered ? 1 : 0,
-        transition:'opacity 0.3s', pointerEvents:'none',
-      }} />
-
       {/* Actions */}
       <div style={{
         position:'absolute', top:'1rem', right:'1rem',
@@ -288,12 +279,6 @@ export default function DashboardPage({ username, onLogout }) {
         {/* Grid bg */}
         <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:0 }}>
           <GridCanvas />
-          {/* Ambient glow */}
-          <div style={{
-            position:'absolute', top:'-10%', left:'20%',
-            width:'50%', height:'40%', borderRadius:'50%',
-            background:'radial-gradient(ellipse, rgba(14,165,233,0.04) 0%, transparent 70%)',
-          }} />
         </div>
 
         <header style={{
@@ -364,7 +349,7 @@ export default function DashboardPage({ username, onLogout }) {
               {/* Logout/Avatar */}
               <div style={{
                   width: 32, height: 32, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #0ea5e9, #6366f1)',
+                  background: 'var(--analisai-cyan)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, fontWeight: 800, color: 'white',
                   cursor: 'pointer'
@@ -427,10 +412,10 @@ export default function DashboardPage({ username, onLogout }) {
               style={{
                 display:'flex', alignItems:'center', gap:'0.5rem',
                 height:44, padding:'0 1.4rem',
-                background:'#e3e3e3',
+                background:'var(--btn-send-bg)',
                 border:'none', borderRadius:9999,
                 fontFamily:"'Syne',sans-serif", fontSize:'0.88rem', fontWeight:600,
-                color:'#131314', cursor:'pointer',
+                color:'var(--btn-send-icon)', cursor:'pointer',
                 transition:'transform 0.15s, box-shadow 0.2s',
               }}
             >
@@ -522,11 +507,10 @@ export default function DashboardPage({ username, onLogout }) {
               {/* Animated icon */}
               <div style={{
                 width:72, height:72, borderRadius:18,
-                background:'rgba(56,189,248,0.07)',
-                border:'1px solid rgba(56,189,248,0.15)',
+                background:'var(--bg-hover)',
+                border:'1px solid var(--border-primary)',
                 display:'flex', alignItems:'center', justifyContent:'center',
-                color:'#38bdf8', marginBottom:'1.5rem',
-                boxShadow:'0 0 30px rgba(56,189,248,0.1)',
+                color:'var(--analisai-cyan)', marginBottom:'1.5rem',
               }}>
                 <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
@@ -554,12 +538,11 @@ export default function DashboardPage({ username, onLogout }) {
                 style={{
                   display:'flex', alignItems:'center', gap:'0.5rem',
                   height:44, padding:'0 1.5rem',
-                  background:'linear-gradient(135deg,#0ea5e9,#6366f1)',
+                  background:'var(--btn-send-bg)',
                   border:'none', borderRadius:10,
                   fontFamily:"'Syne',sans-serif", fontSize:'0.88rem', fontWeight:700,
-                  color:'white', cursor:'pointer',
+                  color:'var(--btn-send-icon)', cursor:'pointer',
                   transition:'transform 0.15s, box-shadow 0.2s',
-                  boxShadow:'0 0 20px rgba(56,189,248,0.15), 0 4px 14px rgba(0,0,0,0.4)',
                 }}
               >
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -169,3 +169,11 @@ def get_session_active_job(
         "question": info.get("question", ""),
         "status": status,
     }
+
+
+@router.post("/cancel/{job_id}")
+def chat_cancel(job_id: str, user: UserInDB = Depends(get_current_user)):
+    """Batalkan job aktif."""
+    from backend.core.job_store import cancel_job
+    cancel_job(user.user_id, job_id)
+    return {"status": "cancelled"}

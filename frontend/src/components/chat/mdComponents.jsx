@@ -25,7 +25,28 @@ export const mdComponents = {
   em: ({ children }) => <em className="italic text-[var(--text-secondary)]">{children}</em>,
   ul: ({ children }) => <ul className="list-disc list-outside pl-5 space-y-1 my-2">{children}</ul>,
   ol: ({ children }) => <ol className="list-decimal list-outside pl-5 space-y-1 my-2">{children}</ol>,
-  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+  li: ({ className, children, ...props }) => {
+    if (className?.includes('task-list-item')) {
+      return <li className="flex items-start gap-2.5 my-1.5 leading-relaxed" {...props}>{children}</li>
+    }
+    return <li className="leading-relaxed" {...props}>{children}</li>
+  },
+  input: ({ type, checked, disabled, ...props }) => {
+    if (type === 'checkbox') {
+      return (
+        <div className="mt-1 shrink-0">
+          <div className={`w-4 h-4 rounded-[4px] border flex items-center justify-center transition-colors ${checked ? 'bg-emerald-500 border-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]' : 'bg-[#1e1e1e] border-[rgba(255,255,255,0.2)]'}`}>
+            {checked && (
+              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </div>
+        </div>
+      )
+    }
+    return <input type={type} checked={checked} disabled={disabled} {...props} />
+  },
   h1: ({ children }) => <h1 className="text-lg font-bold text-[var(--text-heading)] mt-4 mb-2">{children}</h1>,
   h2: ({ children }) => <h2 className="text-base font-bold text-[var(--text-heading)] mt-4 mb-2">{children}</h2>,
   h3: ({ children }) => <h3 className="text-sm font-semibold text-[var(--text-primary)] mt-3 mb-1">{children}</h3>,

@@ -227,15 +227,49 @@ def create_agent(
             return json.dumps({"status": "error", "output": output[:1000]}, ensure_ascii=False)
         return json.dumps({"status": "success", "output": output[:3000]}, ensure_ascii=False)
 
+    @tool
+    def update_task_list_tool(tasks: list[str], completed_indices: list[int]) -> str:
+        """Gunakan tool ini untuk membuat atau mengupdate To-Do List yang tampil di Widget UI khusus pengguna. 
+        Panggil tool ini setiap kali merencanakan tugas baru atau menyelesaikan tugas.
+        - tasks: daftar semua tugas (contoh: ["Inspeksi Data", "Visualisasi Histogram"])
+        - completed_indices: daftar indeks (0-based) dari tugas yang sudah selesai (contoh: [0] jika tugas pertama selesai)
+        """
+        import json
+        _push(json.dumps({
+            "type": "task_widget_update",
+            "tasks": tasks,
+            "completed": completed_indices
+        }))
+        return "Widget To-Do List berhasil diupdate."
+
     # ── File Export Tool ───────────────────────────────────────────────
     @tool
     def file_export_tool(content: str, filename: str, format: str = "md") -> str:
-        """Simpan konten teks ke file (ipynb, csv, xlsx, json, md, html, txt, py). Gunakan untuk mengekspor hasil analisis, notebook, atau laporan — BUKAN untuk visualisasi chart (gunakan render_chart_tool) atau profiling dataset (gunakan data_profile_tool)."""
+        """Simpan konten teks ke file (ipynb, csv, xlsx, json, md, html, txt, py). Gunakan untuk mengekspor hasil analisis, notebook, atau laporan — BUKAN untuk visualisasi chart (gunakan render_chart_tool) atau profiling dataset (gunakan data_profile_tool). Semua file hasil ekspor disimpan di subfolder 'exports/'."""
 
         fmt = format.lower().strip().lstrip(".")
         fname = Path(filename).stem
 
+        exports_folder = data_folder / "exports"
+        exports_folder.mkdir(exist_ok=True)
+
         if fmt == "ipynb":
+            # Cek apakah konten sudah berupa JSON notebook yang valid
+            try:
+                parsed_content = json.loads(content)
+                if isinstance(parsed_content, dict) and "cells" in parsed_content:
+                    out_path = exports_folder / f"{fname}.ipynb"
+                    out_path.write_text(json.dumps(parsed_content, ensure_ascii=False, indent=2), encoding="utf-8")
+                    _push(f"📄 File diekspor: exports/{out_path.name}")
+                    return json.dumps({
+                        "type": "file_export",
+                        "filename": f"exports/{out_path.name}",
+                        "format": fmt,
+                        "size_bytes": out_path.stat().st_size,
+                    }, ensure_ascii=False)
+            except Exception:
+                pass
+
             cells = []
             code_block_re = re.compile(r"```(?:python)?\n(.*?)```", re.DOTALL)
             parts = code_block_re.split(content)
@@ -267,7 +301,7 @@ def create_agent(
                 },
                 "cells": cells or [{"cell_type": "markdown", "metadata": {}, "source": [content]}],
             }
-            out_path = data_folder / f"{fname}.ipynb"
+            out_path = exports_folder / f"{fname}.ipynb"
             out_path.write_text(json.dumps(notebook, ensure_ascii=False, indent=2), encoding="utf-8")
 
         elif fmt == "xlsx":
@@ -282,7 +316,7 @@ def create_agent(
                         df = pd.DataFrame(lines[1:], columns=lines[0])
                     else:
                         df = pd.DataFrame({"content": content.splitlines()})
-                out_path = data_folder / f"{fname}.xlsx"
+                out_path = exports_folder / f"{fname}.xlsx"
                 df.to_excel(out_path, index=False, engine="openpyxl")
             except Exception as exc:
                 return json.dumps({
@@ -291,7 +325,7 @@ def create_agent(
                 }, ensure_ascii=False)
 
         elif fmt == "json":
-            out_path = data_folder / f"{fname}.json"
+            out_path = exports_folder / f"{fname}.json"
             try:
                 parsed = json.loads(content)
                 out_path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -299,7 +333,7 @@ def create_agent(
                 out_path.write_text(content, encoding="utf-8")
 
         elif fmt in ("csv", "md", "html", "txt", "py"):
-            out_path = data_folder / f"{fname}.{fmt}"
+            out_path = exports_folder / f"{fname}.{fmt}"
             out_path.write_text(content, encoding="utf-8")
 
         else:
@@ -308,10 +342,10 @@ def create_agent(
                 "error": f"Format '{fmt}' tidak didukung. Gunakan: ipynb, csv, xlsx, json, md, html, txt, py",
             }, ensure_ascii=False)
 
-        _push(f"📄 File diekspor: {out_path.name}")
+        _push(f"📄 File diekspor: exports/{out_path.name}")
         return json.dumps({
             "type": "file_export",
-            "filename": out_path.name,
+            "filename": f"exports/{out_path.name}",
             "format": fmt,
             "size_bytes": out_path.stat().st_size,
         }, ensure_ascii=False)
@@ -356,6 +390,22 @@ def create_agent(
         if "Error" in output or "Traceback" in output:
             return json.dumps({"status": "error", "output": output[:800]}, ensure_ascii=False)
         return output
+
+    # ── Bash / Shell Tool ─────────────────────────────────────────────
+    @tool
+    def bash_tool(command: str, workdir: str = "/app/data") -> str:
+        """Jalankan command shell di sandbox. Gunakan untuk: cek file (ls), pindah/rename file (mv), salin (cp), hapus (rm), inspect folder, atau operasi sistem cepat lainnya. JANGAN gunakan untuk analisis data — itu tugas python_repl_tool."""
+        import uuid
+        _safe_cmds = {"ls", "dir", "pwd", "whoami", "echo", "cat", "head", "tail", "wc", "stat", "du", "df", "mv", "cp", "rm", "mkdir", "chmod", "file", "sort", "uniq", "cut", "find"}
+        cmd_clean = command.strip().split()
+        base = cmd_clean[0] if cmd_clean else ""
+        if base not in _safe_cmds:
+            _push(f"⚠️ Perintah '{base}' tidak diizinkan — gunakan python_repl_tool untuk operasi kompleks")
+            return json.dumps({"status": "error", "output": f"Perintah '{base}' tidak diizinkan. Gunakan python_repl_tool untuk operasi yang membutuhkan {base}."}, ensure_ascii=False)
+
+        from sandbox import run_bash_in_sandbox
+        output = run_bash_in_sandbox(command, folder_str)
+        return json.dumps({"status": "success", "output": output[:2000]}, ensure_ascii=False)
 
     # ── Render Chart Tool ──────────────────────────────────────────────
     @tool
@@ -594,10 +644,140 @@ def create_agent(
                 "error": f"Profiling error: {type(exc).__name__}: {str(exc)}",
             }, ensure_ascii=False)
 
+    @tool
+    def download_dataset_tool(url: str, filename: str = None) -> str:
+        """Mengunduh berkas dataset (seperti CSV, XLSX, JSON, dll.) dari internet (URL publik, Google Sheets, Kaggle, dll.) ke folder data proyek.
+        Masukkan direct download URL publik, link Google Sheets, atau Kaggle dataset URL / handle (contoh: mohammadtalib786/retail-sales-dataset)."""
+        import requests as _requests
+        
+        # Check if URL is a Kaggle dataset URL or handle
+        is_kaggle = False
+        kaggle_handle = ""
+        
+        if "kaggle.com/datasets/" in url:
+            import re as _re
+            match = _re.search(r'kaggle\.com/datasets/([^/]+/[^/]+)', url)
+            if match:
+                kaggle_handle = match.group(1)
+                is_kaggle = True
+        elif "kaggle.com/" in url:
+            import re as _re
+            match = _re.search(r'kaggle\.com/([^/]+/[^/]+)', url)
+            if match:
+                kaggle_handle = match.group(1)
+                is_kaggle = True
+        elif "/" in url and not url.startswith("http://") and not url.startswith("https://"):
+            import re as _re
+            if _re.match(r'^[^/]+/[^/]+$', url.strip()):
+                kaggle_handle = url.strip()
+                is_kaggle = True
+                
+        if is_kaggle:
+            _push(f"📦 Mengunduh dataset Kaggle '{kaggle_handle}' via kagglehub...")
+        else:
+            _push(f"📥 Mengunduh dataset dari: {url}")
+            
+        try:
+            if is_kaggle:
+                import kagglehub as _kagglehub
+                import shutil as _shutil
+                
+                downloaded_dir = _kagglehub.dataset_download(kaggle_handle)
+                downloaded_path = Path(downloaded_dir)
+                
+                copied_files = []
+                for item in downloaded_path.iterdir():
+                    if item.is_file():
+                        dest_name = item.name
+                        if dest_name in {"_exec_script.py", "_kernel_loop.py", "_schema.json", ".chats.json", "dashboard.json"}:
+                            dest_name = "downloaded_" + dest_name
+                            
+                        dest_path = data_folder / dest_name
+                        _shutil.copy2(item, dest_path)
+                        copied_files.append(dest_name)
+                    elif item.is_dir():
+                        dest_path = data_folder / item.name
+                        if dest_path.exists():
+                            _shutil.rmtree(dest_path)
+                        _shutil.copytree(item, dest_path)
+                        copied_files.append(item.name + "/")
+                
+                if not copied_files:
+                    raise ValueError("Tidak ada file ditemukan di dataset Kaggle yang diunduh.")
+                
+                file_size = sum((data_folder / f).stat().st_size for f in copied_files if (data_folder / f).is_file())
+                
+                _push(f"✅ Kaggle download selesai. File diimpor: {', '.join(copied_files)}")
+                return json.dumps({
+                    "status": "success",
+                    "output": f"Dataset Kaggle '{kaggle_handle}' berhasil diunduh dan diimpor: {', '.join(copied_files)} ({file_size:,} bytes)."
+                }, ensure_ascii=False)
+
+            # Auto-convert Google Sheets link
+            if "docs.google.com/spreadsheets" in url:
+                import re as _re
+                match = _re.search(r'(docs\.google\.com/spreadsheets/d/[^/]+)', url)
+                if match:
+                    url = "https://" + match.group(1) + "/export?format=csv"
+                    _push("⚡ Mendeteksi link Google Sheets, mengonversi ke link ekspor CSV...")
+            
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            }
+            
+            response = _requests.get(url, headers=headers, stream=True, timeout=30)
+            response.raise_for_status()
+            
+            if not filename:
+                cd = response.headers.get("Content-Disposition", "")
+                if "filename=" in cd:
+                    import re as _re
+                    fnames = _re.findall(r'filename=["\']?([^"\';]+)["\']?', cd)
+                    if fnames:
+                        filename = fnames[0]
+                
+                if not filename:
+                    from urllib.parse import urlparse as _urlparse
+                    parsed = _urlparse(url)
+                    filename = Path(parsed.path).name
+                
+                if not filename or filename == "export" or len(filename) < 3:
+                    if "format=csv" in url or "csv" in response.headers.get("Content-Type", ""):
+                        filename = "downloaded_dataset.csv"
+                    elif "xlsx" in response.headers.get("Content-Type", ""):
+                        filename = "downloaded_dataset.xlsx"
+                    else:
+                        filename = "downloaded_dataset.csv"
+            
+            filename = Path(filename).name
+            if filename in {"_exec_script.py", "_kernel_loop.py", "_schema.json", ".chats.json", "dashboard.json"}:
+                filename = "downloaded_" + filename
+                
+            out_path = data_folder / filename
+            with open(out_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            
+            file_size = out_path.stat().st_size
+            _push(f"✅ Unduhan selesai: {filename} ({file_size:,} bytes)")
+            
+            return json.dumps({
+                "status": "success",
+                "output": f"Dataset berhasil diunduh dan disimpan sebagai: {filename} ({file_size:,} bytes)."
+            }, ensure_ascii=False)
+            
+        except Exception as e:
+            _push(f"❌ Gagal mengunduh: {str(e)}")
+            return json.dumps({
+                "status": "error",
+                "output": f"Gagal mengunduh dataset: {str(e)}"
+            }, ensure_ascii=False)
+
     llm = build_llm(model=model, temperature=0, max_output_tokens=8192)
 
     # Build tool list
-    tool_list = [read_data_tool, python_repl_tool, render_chart_tool, file_export_tool, data_profile_tool]
+    tool_list = [update_task_list_tool, read_data_tool, python_repl_tool, render_chart_tool, file_export_tool, data_profile_tool, bash_tool, download_dataset_tool]
 
     return create_react_agent(
         llm,

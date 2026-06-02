@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ═══════════════════════════════════════════════
@@ -70,7 +74,7 @@
   --bg-sidebar-item: rgba(255, 255, 255, 0.08);
   --bg-bubble-user: rgba(255,255,255,0.06);
   --bg-bubble-ai: transparent;
-  --bg-code: #1e1e2e;
+  --bg-code: #000000;
   --bg-output: #131314;
   --bg-overlay: rgba(0,0,0,0.5);
   --bg-hover: rgba(255, 255, 255, 0.04);

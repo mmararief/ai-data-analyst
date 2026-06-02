@@ -30,6 +30,7 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
   const messagesRef = useRef(messages)
   const flushScheduledRef = useRef(false)
   const abortRef = useRef(null)
+  const activeJobIdRef = useRef(null)
 
   // Keep ref in sync when external setMessages calls happen (history load etc).
   useEffect(() => { messagesRef.current = messages }, [messages])
@@ -131,6 +132,7 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
       })
       if (!startRes.ok) throw new Error('Gagal memulai job')
       const { job_id, session_id: assignedSessionId } = await startRes.json()
+      activeJobIdRef.current = job_id
       if (!currentSessionId) {
         currentSessionId = assignedSessionId
         setSessionId(assignedSessionId)
@@ -158,6 +160,7 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
       })
     } finally {
       abortRef.current = null
+      activeJobIdRef.current = null
       setLoading(false)
       setStatusText('')
       // Persist to history
@@ -165,6 +168,7 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
         ...priorMessages.map(m => ({
           role: m.role, content: m.content || '',
           parts: m.parts || [], codeSteps: m.codeSteps || [], images: m.images || [],
+          taskWidget: m.taskWidget || null
         })),
         { role: 'user', content: userLabel, parts: [{ type: 'text', content: userLabel }], codeSteps: [], images: [] },
         {
@@ -173,6 +177,7 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
           parts: accumulated.parts,
           codeSteps: accumulated.codeSteps,
           images: accumulated.images,
+          taskWidget: accumulated.taskWidget || null
         },
       ]
       const firstUser = toSave.find(m => m.role === 'user')
@@ -190,6 +195,10 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
   }, [loading, sessionId, setSessionId, projectId, replaceMessages, processEventStream])
 
   const handleStopGeneration = useCallback(() => {
+    if (activeJobIdRef.current) {
+      api.post(`/chat/cancel/${activeJobIdRef.current}`).catch(() => {})
+      activeJobIdRef.current = null
+    }
     if (abortRef.current) {
       abortRef.current.abort()
       abortRef.current = null
@@ -199,14 +208,21 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
   // ── Higher-level send helpers exposed to ChatPage ────────────────────────
   const buildHistory = useCallback(() => {
     return messagesRef.current
-      .filter(m => m.content && m.content.trim())
-      .map(m => ({ role: m.role, content: m.content }))
+      .map(m => {
+        let text = (m.content || '').trim()
+        if (!text && m.role === 'assistant' && m.parts?.length > 0) {
+          const types = [...new Set(m.parts.map(p => p.type))].join(', ')
+          text = `[Tindakan eksekusi AI: ${types}]`
+        }
+        return { role: m.role, content: text }
+      })
+      .filter(m => m.content)
   }, [])
 
   const sendMessage = useCallback((question) => {
     if (!question?.trim() || loading) return
     streamFromEndpoint(
-      { question, history: buildHistory(), project_id: projectId, mode: 'plan_only' },
+      { question, history: buildHistory(), project_id: projectId, mode: 'full' },
       question,
     )
   }, [loading, buildHistory, projectId, streamFromEndpoint])
@@ -218,7 +234,7 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
         question: 'Jalankan rencana eksekusi.',
         history: buildHistory(),
         project_id: projectId,
-        mode: 'execute_only',
+        mode: 'full',
         approved_plan: plan,
       },
       'Setuju, jalankan rencana tersebut.',
@@ -228,7 +244,7 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
   const selectOption = useCallback((optionText) => {
     if (loading) return
     streamFromEndpoint(
-      { question: optionText, history: buildHistory(), project_id: projectId, mode: 'plan_only' },
+      { question: optionText, history: buildHistory(), project_id: projectId, mode: 'full' },
       optionText,
     )
   }, [loading, buildHistory, projectId, streamFromEndpoint])
@@ -308,15 +324,44 @@ function applyEventToAccumulator(acc, event) {
       acc.parts.push({ type: 'image', content: event.content, filename: event.filename || '' })
       acc.images.push(event.content)
       break
+    case 'code_chunk': {
+      if (acc.codeSteps.length === 0 || acc.codeSteps[acc.codeSteps.length - 1].output) {
+        acc.codeSteps.push({
+          code: '', output: '', progressLines: [], tool: 'python_repl_tool', filename: '', _rawCode: ''
+        })
+        acc.parts.push({ type: 'code_step', stepIndex: acc.codeSteps.length - 1 })
+      }
+      const lastStep = acc.codeSteps[acc.codeSteps.length - 1]
+      lastStep._rawCode = (lastStep._rawCode || '') + event.content
+      
+      let cleanCode = lastStep._rawCode
+      const matchStart = cleanCode.match(/^{\s*"[^"]+"\s*:\s*"/);
+      if (matchStart) {
+        cleanCode = cleanCode.substring(matchStart[0].length)
+      }
+      cleanCode = cleanCode.replace(/("?\s*}?\s*)$/, '')
+      cleanCode = cleanCode.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+      lastStep.code = cleanCode
+      break
+    }
     case 'code':
-      acc.codeSteps.push({
-        code: event.content, output: '', progressLines: [],
-        tool: event.tool || 'python_repl_tool', filename: event.filename || '',
-      })
-      acc.parts.push({ type: 'code_step', stepIndex: acc.codeSteps.length - 1 })
+      if (acc.codeSteps.length > 0 && !acc.codeSteps[acc.codeSteps.length - 1].output) {
+        acc.codeSteps[acc.codeSteps.length - 1].code = event.content
+        acc.codeSteps[acc.codeSteps.length - 1].tool = event.tool || 'python_repl_tool'
+        acc.codeSteps[acc.codeSteps.length - 1].filename = event.filename || ''
+      } else {
+        acc.codeSteps.push({
+          code: event.content, output: '', progressLines: [],
+          tool: event.tool || 'python_repl_tool', filename: event.filename || '',
+        })
+        acc.parts.push({ type: 'code_step', stepIndex: acc.codeSteps.length - 1 })
+      }
       break
     case 'output':
       if (acc.codeSteps.length) acc.codeSteps[acc.codeSteps.length - 1].output = event.content
+      break
+    case 'task_widget_update':
+      acc.taskWidget = { tasks: event.tasks || [], completed: event.completed || [] }
       break
     case 'plan':
       acc.parts.unshift({ type: 'plan', content: event.content })

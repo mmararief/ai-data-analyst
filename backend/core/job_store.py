@@ -59,6 +59,11 @@ def finish_job(user_id: str, job_id: str, error: str | None = None) -> None:
     _rc.set(_sk(user_id, job_id), status, ex=_JOB_TTL)
 
 
+def cancel_job(user_id: str, job_id: str) -> None:
+    """Tandai job dibatalkan oleh pengguna."""
+    _rc.set(_sk(user_id, job_id), "cancelled", ex=_JOB_TTL)
+
+
 def get_status(user_id: str, job_id: str) -> str | None:
     """Return status string atau None jika job tidak ada / sudah expired."""
     return _rc.get(_sk(user_id, job_id))

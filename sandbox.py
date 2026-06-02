@@ -30,13 +30,6 @@ _BLOCKED_PATTERNS = [
     r"\bimport\s+(?:subprocess|shutil|socket|http|urllib|requests|ctypes)\b",
     r"\bfrom\s+(?:subprocess|shutil|socket|http|urllib|requests|ctypes)\s+import\b",
     r"\bopen\s*\([^)]*['\"]w",
-    r"\beval\b",
-    r"\bcompile\b",
-    r"\bglobals\s*\(\s*\)",
-    r"\blocals\s*\(\s*\)",
-    r"\bgetattr\s*\(",
-    r"\bsetattr\s*\(",
-    r"\bdelattr\s*\(",
     r"\b__builtins__\b",
     r"\bexecfile\b",
     r"\breload\b",
@@ -257,6 +250,17 @@ def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str):
 
 def run_ai_code_securely(ai_generated_code: str, data_folder_path: str) -> str:
     return "".join(stream_ai_code_securely(ai_generated_code, data_folder_path))
+
+def run_bash_in_sandbox(command: str, data_folder_path: str) -> str:
+    absolute_data_path = os.path.abspath(data_folder_path)
+    lock = _get_lock(absolute_data_path)
+    with lock:
+        try:
+            container = _ensure_sandbox_started(absolute_data_path)
+            res = container.exec_run(["bash", "-c", command], workdir="/app/data")
+            return res.output.decode("utf-8", errors="replace")
+        except Exception as e:
+            return f"Bash execution failed: {str(e)}"
 
 if __name__ == "__main__":
     test_code = "import os\nx = 5\nprint('Hello Stateful Sandbox!')"

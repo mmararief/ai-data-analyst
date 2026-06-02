@@ -43,7 +43,7 @@ TEMP_ROOT.mkdir(exist_ok=True)
 AI_PROVIDER: str = os.environ.get("AI_PROVIDER", "sumopod").lower()
 MODEL_CHAT: str = os.environ.get("MODEL_CHAT", "gpt-4o-mini")
 MODEL_DEEP: str = os.environ.get("MODEL_DEEP", "gpt-4o-mini")
-# Per-role model overrides (defaults to MODEL_CHAT if not set)
+# Legacy per-role overrides (kept for backward compat, single agent uses MODEL_CHAT only)
 MODEL_INTENT: str = os.environ.get("MODEL_INTENT", "") or MODEL_CHAT
 MODEL_PLANNER: str = os.environ.get("MODEL_PLANNER", "") or MODEL_CHAT
 MODEL_EXECUTOR: str = os.environ.get("MODEL_EXECUTOR", "") or MODEL_CHAT

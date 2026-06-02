@@ -58,34 +58,54 @@ export default function ClarificationCard({ part, isLastMessage, isLoading, onSu
   }
 
   return (
-    <div className="my-4 bg-sky-500/10 border border-sky-500/20 rounded-lg p-4 shadow-sm animate-fade-in">
-      <div className="flex items-start gap-3 mb-3">
-        <div className="text-sky-400 mt-0.5 shrink-0">
+    <div 
+      className="my-4 rounded-2xl p-5 shadow-sm animate-fade-in"
+      style={{
+        background: 'var(--bg-card)',
+        border: '1px solid var(--border-primary)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.02)',
+      }}
+    >
+      <div className="flex items-start gap-3.5 mb-4">
+        <div 
+          className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+          style={{
+            background: 'rgba(56,189,248,0.1)',
+            border: '1px solid rgba(56,189,248,0.2)',
+            color: 'var(--analisai-cyan)',
+          }}
+        >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <div className="flex-1">
-          <p className="text-[12px] font-semibold uppercase tracking-wider text-sky-400/80 mb-0.5">
-            Intent Agent
+        <div className="flex-1 min-w-0">
+          <p 
+            className="text-[10px] font-bold uppercase tracking-wider mb-0.5"
+            style={{
+              color: 'var(--analisai-cyan)',
+              fontFamily: "'JetBrains Mono', monospace",
+            }}
+          >
+            Butuh Klarifikasi
           </p>
-          <p className="text-[13px] text-[var(--text-primary)]">
-            Saya butuh sedikit klarifikasi sebelum melanjutkan{questions.length > 1 ? ` (${questions.length} pertanyaan)` : ''}:
+          <p className="text-[13px] text-[var(--text-secondary)] font-medium leading-relaxed">
+            Saya mendeteksi beberapa dataset di workspace Anda. Silakan tentukan data yang ingin dianalisis sebelum melanjutkan:
           </p>
         </div>
       </div>
 
-      <div className="space-y-4 ml-8">
+      <div className="space-y-4 ml-0 md:ml-12">
         {questions.map((q, qi) => {
           const selected = answers[q.id]
           return (
-            <div key={q.id || qi} className="space-y-2">
-              <p className="text-[13px] font-medium text-[var(--text-primary)] flex items-start gap-2">
-                <span className="text-sky-400 font-mono text-[11px] mt-0.5">{qi + 1}.</span>
+            <div key={q.id || qi} className="space-y-2.5">
+              <p className="text-[13px] font-semibold text-[var(--text-primary)] flex items-start gap-2">
+                <span className="text-[var(--analisai-cyan)] font-mono text-[11px] mt-0.5">{qi + 1}.</span>
                 <span className="flex-1">
                   {q.question}
                   {q.allow_multiple && (
-                    <span className="ml-2 text-[10px] uppercase tracking-wider text-[var(--text-muted)] font-normal">
+                    <span className="ml-2 text-[9px] uppercase tracking-wider text-[var(--text-muted)] font-normal">
                       (boleh pilih lebih dari satu)
                     </span>
                   )}
@@ -102,11 +122,33 @@ export default function ClarificationCard({ part, isLastMessage, isLoading, onSu
                       type="button"
                       disabled={!isInteractive}
                       onClick={() => isInteractive && toggleOption(q.id, opt, q.allow_multiple)}
-                      className={`px-3 py-1.5 rounded text-[12px] transition-colors border ${
-                        isActive
-                          ? 'bg-sky-500/30 border-sky-400 text-[var(--text-primary)] font-medium'
-                          : 'bg-[var(--bg-tertiary)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-sky-500/15 hover:border-sky-500/40'
-                      } ${!isInteractive ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                      style={{
+                        padding: '0.45rem 0.85rem',
+                        borderRadius: '10px',
+                        fontSize: '11.5px',
+                        fontWeight: isActive ? 600 : 500,
+                        border: '1px solid',
+                        borderColor: isActive ? 'var(--analisai-cyan)' : 'var(--border-primary)',
+                        background: isActive ? 'rgba(56,189,248,0.15)' : 'var(--bg-card)',
+                        color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        boxShadow: isActive ? '0 0 10px rgba(56,189,248,0.1)' : 'none',
+                        cursor: isInteractive ? 'pointer' : 'not-allowed',
+                        opacity: !isInteractive && !isActive ? 0.6 : 1,
+                        transition: 'all 0.15s ease',
+                      }}
+                      className="hover:opacity-90"
+                      onMouseEnter={e => {
+                        if (isInteractive && !isActive) {
+                          e.currentTarget.style.borderColor = 'var(--analisai-cyan)'
+                          e.currentTarget.style.background = 'rgba(56,189,248,0.06)'
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (isInteractive && !isActive) {
+                          e.currentTarget.style.borderColor = 'var(--border-primary)'
+                          e.currentTarget.style.background = 'var(--bg-card)'
+                        }
+                      }}
                     >
                       {opt}
                     </button>
@@ -119,21 +161,30 @@ export default function ClarificationCard({ part, isLastMessage, isLoading, onSu
       </div>
 
       {isInteractive && (
-        <div className="mt-4 ml-8 flex items-center gap-3">
+        <div className="mt-5 ml-0 md:ml-12 flex items-center gap-3">
           <button
             type="button"
             onClick={handleSubmit}
             disabled={!allAnswered}
-            className={`px-4 py-2 rounded-md text-[12.5px] font-semibold transition-all shadow-sm flex items-center gap-2 ${
-              allAnswered
-                ? 'bg-sky-500 hover:bg-sky-400 text-white'
-                : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
-            }`}
+            style={{
+              padding: '0.55rem 1.1rem',
+              borderRadius: '12px',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              background: allAnswered ? 'var(--analisai-cyan)' : 'var(--bg-card)',
+              border: '1px solid',
+              borderColor: allAnswered ? 'var(--analisai-cyan)' : 'var(--border-primary)',
+              color: allAnswered ? '#131314' : 'var(--text-muted)',
+              cursor: allAnswered ? 'pointer' : 'not-allowed',
+              boxShadow: allAnswered ? '0 2px 8px rgba(56,189,248,0.15)' : 'none',
+              transition: 'all 0.2s ease',
+            }}
+            className="flex items-center gap-2"
           >
+            <span>Kirim Jawaban</span>
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
-            Kirim Jawaban
           </button>
           {!allAnswered && (
             <span className="text-[11px] text-[var(--text-muted)]">
@@ -146,7 +197,7 @@ export default function ClarificationCard({ part, isLastMessage, isLoading, onSu
       {/* Backwards-compat: if old single-option layout is in play and a legacy
           handler is provided, expose quick-pick buttons too. */}
       {isInteractive && !onSubmit && onSelectOption && questions.length === 1 && (
-        <div className="mt-3 ml-8 flex flex-wrap gap-2">
+        <div className="mt-3 ml-0 md:ml-12 flex flex-wrap gap-2">
           {(questions[0].options || []).map((opt, i) => (
             <button
               key={i}

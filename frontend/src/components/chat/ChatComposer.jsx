@@ -2,6 +2,7 @@
 // suggestion chips (only shown when the chat is empty), and disclaimer text.
 
 import { useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const QUICK_PROMPTS = [
   {
@@ -169,36 +170,47 @@ export default function ChatComposer({
           </div>
         </div>
 
-        {showSuggestions && (
-          <div style={{
-            display: 'flex', gap: '0.6rem', flexWrap: 'wrap',
-            justifyContent: 'center', marginTop: '1.25rem',
-          }}>
-            {QUICK_PROMPTS.map(qp => (
-              <button
-                key={qp.label}
-                onClick={() => submit(qp.prompt)}
-                style={{
-                  padding: '0.5rem 1rem', borderRadius: 9999,
-                  background: 'var(--bg-card)',
-                  border: '1px solid var(--border-primary)',
-                  color: 'var(--text-secondary)',
-                  fontSize: '0.8rem', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '0.4rem',
-                  transition: 'background 0.2s',
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                <span style={{ color: qp.color, display: 'flex' }}>{qp.icon}</span>
-                {qp.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <AnimatePresence>
+          {showSuggestions && (
+            <motion.div
+              key="suggestions"
+              initial={{ height: 0, opacity: 0, marginTop: 0 }}
+              animate={{ height: 'auto', opacity: 1, marginTop: '1.25rem' }}
+              exit={{ height: 0, opacity: 0, marginTop: 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              style={{ overflow: 'hidden' }}
+            >
+              <div style={{
+                display: 'flex', gap: '0.6rem', flexWrap: 'wrap',
+                justifyContent: 'center', paddingBottom: '0.5rem',
+              }}>
+                {QUICK_PROMPTS.map(qp => (
+                  <button
+                    key={qp.label}
+                    onClick={() => submit(qp.prompt)}
+                    style={{
+                      padding: '0.5rem 1rem', borderRadius: 9999,
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-primary)',
+                      color: 'var(--text-secondary)',
+                      fontSize: '0.8rem', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '0.4rem',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <span style={{ color: qp.color, display: 'flex' }}>{qp.icon}</span>
+                    {qp.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div style={{
-          textAlign: 'center', marginTop: showSuggestions ? '1rem' : '0.75rem',
+          textAlign: 'center', marginTop: '0.75rem',
           fontFamily: "'Syne', sans-serif",
           fontSize: '0.65rem', color: 'var(--text-muted)',
         }}>

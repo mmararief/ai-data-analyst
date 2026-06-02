@@ -84,19 +84,55 @@ export function applyEventToLastMessage(messages, event) {
       next.parts = [...(prev.parts || []), { type: 'image', content: event.content, filename: event.filename || '' }]
       next.images = [...(prev.images || []), event.content]
       break
+    case 'code_chunk': {
+      const steps = [...(prev.codeSteps || [])]
+      let stepIndex = steps.length - 1
+      
+      if (stepIndex < 0 || steps[stepIndex].output) {
+        steps.push({ code: '', progressLines: [], tool: 'python_repl_tool', filename: '', _rawCode: '' })
+        stepIndex = steps.length - 1
+        next.parts = [...(prev.parts || []), { type: 'code_step', stepIndex }]
+      }
+      
+      const lastStep = steps[stepIndex]
+      let rawContent = (lastStep._rawCode || '') + event.content
+      
+      let cleanCode = rawContent
+      const matchStart = cleanCode.match(/^{\s*"[^"]+"\s*:\s*"/);
+      if (matchStart) {
+        cleanCode = cleanCode.substring(matchStart[0].length)
+      }
+      cleanCode = cleanCode.replace(/("?\s*}?\s*)$/, '')
+      cleanCode = cleanCode.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+      
+      steps[stepIndex] = { ...lastStep, _rawCode: rawContent, code: cleanCode }
+      next.codeSteps = steps
+      break
+    }
     case 'code': {
-      const newSteps = [
-        ...(prev.codeSteps || []),
-        { code: event.content, progressLines: [], tool: event.tool || 'python_repl_tool', filename: event.filename || '' },
-      ]
-      next.codeSteps = newSteps
-      next.parts = [...(prev.parts || []), { type: 'code_step', stepIndex: newSteps.length - 1 }]
+      const steps = [...(prev.codeSteps || [])]
+      if (steps.length > 0 && !steps[steps.length - 1].output) {
+        steps[steps.length - 1] = {
+           ...steps[steps.length - 1],
+           code: event.content,
+           tool: event.tool || 'python_repl_tool',
+           filename: event.filename || ''
+        }
+      } else {
+        steps.push({ code: event.content, progressLines: [], tool: event.tool || 'python_repl_tool', filename: event.filename || '' })
+        next.parts = [...(prev.parts || []), { type: 'code_step', stepIndex: steps.length - 1 }]
+      }
+      next.codeSteps = steps
       break
     }
     case 'output': {
       const steps = [...(prev.codeSteps || [])]
       if (steps.length) steps[steps.length - 1] = { ...steps[steps.length - 1], output: event.content }
       next.codeSteps = steps
+      break
+    }
+    case 'task_widget_update': {
+      next.taskWidget = { tasks: event.tasks || [], completed: event.completed || [] }
       break
     }
     case 'progress': {
@@ -179,14 +215,6 @@ export function applyEventToLastMessage(messages, event) {
   return out
 }
 
-// Map SSE event type to a status string for the header badge.
-const AGENT_LABEL_MAP = {
-  Intent: 'Memahami pertanyaan Anda...',
-  Planner: 'Merencanakan...',
-  Execution: 'Menjalankan...',
-  Critic: 'Mengevaluasi...',
-}
-
 export function statusForEvent(event) {
   switch (event?.type) {
     case 'text': return 'Menyusun jawaban...'
@@ -195,13 +223,13 @@ export function statusForEvent(event) {
     case 'output': return 'Membaca hasil eksekusi...'
     case 'image': return 'Membuat grafik...'
     case 'error': return 'Terjadi kesalahan...'
-    case 'agent_label': return AGENT_LABEL_MAP[event.content] || `${event.content} Agent`
-    case 'critic': return 'Evaluasi Critic Agent...'
+    case 'agent_label': return event.content === 'Execution' ? 'Menjalankan analisis...' : `${event.content}...`
+    case 'critic': return 'Mengevaluasi hasil...'
     case 'plan': return `Merencanakan ${event.content?.length || 0} langkah...`
     case 'task_start': return `[${(event.index ?? 0) + 1}/${event.total}] ${event.content}`
-    case 'file_export_start': return `📄 Mengekspor ${event.filename}...`
-    case 'file_export_done': return `✅ File diekspor: ${event.filename}`
-    case 'chart_start': return `📈 Membuat chart: ${event.filename}`
+    case 'file_export_start': return `Mengekspor ${event.filename}...`
+    case 'file_export_done': return `File diekspor: ${event.filename}`
+    case 'chart_start': return `Membuat chart: ${event.filename}`
     default: return null
   }
 }

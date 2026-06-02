@@ -2,6 +2,7 @@
 // floating "scroll to bottom" pill.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import MessageBubble from '../MessageBubble'
 
 export default function ChatMessageList({
@@ -14,6 +15,8 @@ export default function ChatMessageList({
   onSelectOption,
   onSubmitClarification,
   computerPanelOpen,
+  selectedStepIndex,
+  onSelectCodeStep,
 }) {
   const scrollAreaRef = useRef(null)
   const bottomRef = useRef(null)
@@ -70,7 +73,28 @@ export default function ChatMessageList({
           position: 'relative', zIndex: 1,
         }}
       >
-        {messages.length === 0 && <EmptyState username={username} />}
+        <AnimatePresence>
+          {messages.length === 0 && (
+            <motion.div
+              key="empty-state"
+              initial={{ opacity: 0, y: 15, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -30, scale: 0.95 }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2rem 1.5rem',
+              }}
+            >
+              <EmptyState username={username} />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {messages.map((msg, i) => (
           <MessageBubble
@@ -85,6 +109,8 @@ export default function ChatMessageList({
             onSelectOption={onSelectOption}
             onSubmitClarification={onSubmitClarification}
             computerPanelOpen={computerPanelOpen && i === messages.length - 1}
+            selectedStepIndex={i === messages.length - 1 ? selectedStepIndex : -1}
+            onSelectCodeStep={onSelectCodeStep}
           />
         ))}
         <div ref={bottomRef} />
@@ -100,9 +126,9 @@ export default function ChatMessageList({
 function EmptyState({ username }) {
   return (
     <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column',
+      display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      textAlign: 'center', animation: 'fadeInUp 0.6s ease both',
+      textAlign: 'center',
       padding: '2rem 1rem',
     }}>
       <div style={{

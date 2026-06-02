@@ -5,7 +5,7 @@ from pathlib import Path
 
 from backend.agent_runner import run_agent_stream
 from backend.core.config import TEMP_ROOT
-from backend.core.job_store import append_event, clear_active_job, finish_job, set_job_running
+from backend.core.job_store import append_event, clear_active_job, finish_job, set_job_running, get_status
 from backend.core.minio_store import download_user_files, upload_generated_files
 from backend.core.redis_store import save_session as _redis_save_session
 
@@ -81,6 +81,7 @@ def process_job(payload: dict) -> None:
 
         logger.info("🤖 Running agent...")
         event_count = 0
+        is_cancelled = False
         for event in run_agent_stream(
             tmp,
             question,
@@ -88,6 +89,11 @@ def process_job(payload: dict) -> None:
             mode=mode,
             approved_plan=approved_plan,
         ):
+            if get_status(user_id, job_id) == "cancelled":
+                logger.info(f"🛑 Job {job_id} was cancelled by user. Terminating runner...")
+                is_cancelled = True
+                break
+
             append_event(user_id, job_id, event)
             acc_events.append(event)
             event_count += 1
@@ -101,8 +107,11 @@ def process_job(payload: dict) -> None:
         logger.info(f"💾 Auto-saving session history...")
         _auto_save_session(user_id, project_id, session_id, question, history, acc_events)
 
-        logger.info(f"✅ Marking job {job_id} as done")
-        finish_job(user_id, job_id)
+        if is_cancelled:
+            logger.info(f"🛑 Job {job_id} marked as cancelled.")
+        else:
+            logger.info(f"✅ Marking job {job_id} as done")
+            finish_job(user_id, job_id)
 
     except Exception as exc:
         logger.error(f"❌ Job {job_id} execution failed: {str(exc)}")
@@ -229,6 +238,14 @@ def _auto_save_session(
                 "judgment": ev.get("judgment", "ok"),
                 "feedback": ev.get("feedback", ""),
                 "additional_tasks": ev.get("additional_tasks", []),
+            })
+        elif t == "file_export_done":
+            ai_parts.append({
+                "type": "file_export",
+                "filename": ev.get("filename"),
+                "format": ev.get("format"),
+                "size_bytes": ev.get("size_bytes"),
+                "error": ev.get("error"),
             })
 
 

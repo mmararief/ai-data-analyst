@@ -17,6 +17,7 @@ class MsgItem(BaseModel):
     parts: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     codeSteps: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     images: Optional[List[str]] = Field(default_factory=list)
+    taskWidget: Optional[Dict[str, Any]] = None
 
 
 class SaveRequest(BaseModel):

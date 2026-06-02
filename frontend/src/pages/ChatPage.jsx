@@ -10,7 +10,10 @@ import ChatHeader from '../components/chat/ChatHeader'
 import ChatMessageList from '../components/chat/ChatMessageList'
 import ChatComposer from '../components/chat/ChatComposer'
 import ComputerPanel from '../components/chat/ComputerPanel'
+import TaskWidget from '../components/chat/TaskWidget'
 import { useChatStream } from '../hooks/useChatStream'
+import DataPreviewModal from '../components/DataPreviewModal'
+import DashboardViewer from '../components/chat/DashboardViewer'
 
 export default function ChatPage({ username, onLogout }) {
   const { projectId, sessionId: urlSessionId } = useParams()
@@ -25,6 +28,8 @@ export default function ChatPage({ username, onLogout }) {
   const [, setProjectName] = useState('') // currently unused in UI but fetched for future header use
   const [panelVisible, setPanelVisible] = useState(false)
   const [panelManuallyHidden, setPanelManuallyHidden] = useState(false)
+  const [selectedStepIndex, setSelectedStepIndex] = useState(-1)
+  const [previewFilename, setPreviewFilename] = useState(null)
   const resizingRef = useRef(false)
 
   const {
@@ -145,12 +150,17 @@ export default function ChatPage({ username, onLogout }) {
     )
   }, [lastAssistantMsg])
 
-  // Auto-show panel when AI starts producing tool calls.
+  // Auto-show panel and select latest step when AI starts producing tool calls.
   useEffect(() => {
-    if (loading && hasPanelContent && !panelManuallyHidden) {
-      setPanelVisible(true)
+    if (loading && hasPanelContent) {
+      if (!panelManuallyHidden) setPanelVisible(true)
+      
+      const codeSteps = lastAssistantMsg?.codeSteps || []
+      if (codeSteps.length > 0) {
+        setSelectedStepIndex(codeSteps.length - 1)
+      }
     }
-  }, [loading, hasPanelContent, panelManuallyHidden])
+  }, [loading, hasPanelContent, panelManuallyHidden, lastAssistantMsg?.codeSteps?.length])
 
   // Reset manual-hide flag when a new message cycle starts.
   useEffect(() => {
@@ -168,8 +178,45 @@ export default function ChatPage({ username, onLogout }) {
     } else {
       setPanelVisible(true)
       setPanelManuallyHidden(false)
+      // Select the last code step if none selected
+      if (selectedStepIndex === -1 && lastAssistantMsg?.codeSteps?.length > 0) {
+        setSelectedStepIndex(lastAssistantMsg.codeSteps.length - 1)
+      }
     }
   }
+
+  const handleSelectCodeStep = (index) => {
+    setSelectedStepIndex(index)
+    setPanelVisible(true)
+    setPanelManuallyHidden(false)
+  }
+
+  // ── To-Do List widget logic ──────────────────────────────────────────────
+  const [todoVisible, setTodoVisible] = useState(() => {
+    try {
+      const stored = localStorage.getItem('todo-widget-visible')
+      return stored !== 'false'
+    } catch (e) {
+      return true
+    }
+  })
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('todo-widget-visible', todoVisible)
+    } catch (e) {
+      // ignore
+    }
+  }, [todoVisible])
+
+  const todoWidgetData = lastAssistantMsg?.taskWidget
+  const hasTodoWidget = !!(todoWidgetData?.tasks && todoWidgetData.tasks.length > 0)
+  const todoProgress = useMemo(() => {
+    if (!hasTodoWidget) return 0
+    const tasks = todoWidgetData.tasks
+    const completed = todoWidgetData.completed || []
+    return Math.round((completed.length / tasks.length) * 100)
+  }, [hasTodoWidget, todoWidgetData])
 
   return (
     <>
@@ -208,6 +255,7 @@ export default function ChatPage({ username, onLogout }) {
         >
           <Sidebar
             projectId={projectId}
+            sessionId={sessionId}
             onSuggest={sendMessage}
             onLoadHistory={handleLoadHistory}
             onNewChat={handleNewChat}
@@ -216,6 +264,12 @@ export default function ChatPage({ username, onLogout }) {
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             width={sidebarWidth}
+            username={username}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onLogout={onLogout}
+            previewFilename={previewFilename}
+            setPreviewFilename={setPreviewFilename}
           />
         </div>
 
@@ -223,6 +277,7 @@ export default function ChatPage({ username, onLogout }) {
         <div className="flex md:hidden">
           <Sidebar
             projectId={projectId}
+            sessionId={sessionId}
             onSuggest={sendMessage}
             onLoadHistory={handleLoadHistory}
             onNewChat={handleNewChat}
@@ -230,6 +285,12 @@ export default function ChatPage({ username, onLogout }) {
             isOpen={sidebarOpen}
             onClose={() => setSidebarOpen(false)}
             width={sidebarWidth}
+            username={username}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            onLogout={onLogout}
+            previewFilename={previewFilename}
+            setPreviewFilename={setPreviewFilename}
           />
         </div>
 
@@ -247,41 +308,48 @@ export default function ChatPage({ username, onLogout }) {
           onMouseDown={e => { e.preventDefault(); resizingRef.current = true }}
         />
 
-        {/* Main column */}
-        <div style={{
-          flex: 1, display: 'flex', flexDirection: 'column',
-          minWidth: 0, position: 'relative',
-          background: 'var(--bg-page)',
-        }}>
-          {/* Subtle grid background */}
+        {/* Workspace Column / Panel Wrapper */}
+        <div style={{ flex: 1, display: 'flex', minWidth: 0, position: 'relative' }}>
+          {/* Main column */}
           <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none',
-            backgroundImage: `
-              linear-gradient(rgba(56,189,248,0.025) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(56,189,248,0.025) 1px, transparent 1px)
-            `,
-            backgroundSize: '60px 60px',
-            maskImage: 'radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 100%)',
-          }} />
+            flex: 1, display: 'flex', flexDirection: 'column',
+            minWidth: 0, position: 'relative',
+            background: 'var(--bg-page)',
+          }}>
+            {hasTodoWidget && todoVisible && (
+              <TaskWidget 
+                tasks={todoWidgetData.tasks} 
+                completed={todoWidgetData.completed || []} 
+                onClose={() => setTodoVisible(false)}
+              />
+            )}
+            {/* Subtle grid background */}
+            <div style={{
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              backgroundImage: `
+                linear-gradient(rgba(56,189,248,0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56,189,248,0.025) 1px, transparent 1px)
+              `,
+              backgroundSize: '60px 60px',
+              maskImage: 'radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 100%)',
+            }} />
 
-          <ChatHeader
-            username={username}
-            loading={loading}
-            statusText={statusText}
-            sidebarCollapsed={sidebarCollapsed}
-            onExpandSidebar={() => setSidebarCollapsed(false)}
-            theme={theme}
-            onToggleTheme={toggleTheme}
-            onLogout={onLogout}
-            panelVisible={panelVisible}
-            hasPanelContent={hasPanelContent}
-            onTogglePanel={handleTogglePanel}
-          />
+            <ChatHeader
+              loading={loading}
+              statusText={statusText}
+              sidebarCollapsed={sidebarCollapsed}
+              onExpandSidebar={() => setSidebarCollapsed(false)}
+              panelVisible={panelVisible}
+              hasPanelContent={hasPanelContent}
+              onTogglePanel={handleTogglePanel}
+              hasTodoWidget={hasTodoWidget}
+              todoVisible={todoVisible}
+              onToggleTodo={() => setTodoVisible(v => !v)}
+              todoProgress={todoProgress}
+            />
 
-          {/* Split area: chat + computer panel */}
-          <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-            {/* Chat messages column */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            {/* Chat messages area */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <ChatMessageList
                 messages={messages}
                 loading={loading}
@@ -292,26 +360,46 @@ export default function ChatPage({ username, onLogout }) {
                 onSelectOption={selectOption}
                 onSubmitClarification={submitClarification}
                 computerPanelOpen={panelVisible}
+                selectedStepIndex={selectedStepIndex}
+                onSelectCodeStep={handleSelectCodeStep}
               />
             </div>
 
-            {/* Computer panel (right side) */}
-            {panelVisible && hasPanelContent && (
-              <ComputerPanel
-                message={lastAssistantMsg}
-                loading={loading}
-                statusText={statusText}
-                onClose={handleClosePanel}
-              />
-            )}
+            <ChatComposer
+              loading={loading}
+              showSuggestions={messages.length === 0}
+              onSend={sendMessage}
+              onStop={handleStopGeneration}
+            />
           </div>
 
-          <ChatComposer
-            loading={loading}
-            showSuggestions={messages.length === 0}
-            onSend={sendMessage}
-            onStop={handleStopGeneration}
-          />
+          {/* Computer panel (right side, full vertical height!) */}
+          {panelVisible && hasPanelContent && (
+            <ComputerPanel
+              message={lastAssistantMsg}
+              loading={loading}
+              statusText={statusText}
+              onClose={handleClosePanel}
+              selectedStepIndex={selectedStepIndex}
+            />
+          )}
+
+          {/* Overlays */}
+          {previewFilename && (
+            previewFilename.toLowerCase().endsWith('dashboard.json') ? (
+              <DashboardViewer
+                projectId={projectId}
+                filename={previewFilename}
+                onClose={() => setPreviewFilename(null)}
+              />
+            ) : (
+              <DataPreviewModal
+                projectId={projectId}
+                filename={previewFilename}
+                onClose={() => setPreviewFilename(null)}
+              />
+            )
+          )}
         </div>
       </div>
     </>

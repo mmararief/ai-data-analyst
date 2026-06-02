@@ -1,5 +1,6 @@
 import io
 import json
+import re
 import time
 from pathlib import Path
 from posixpath import normpath
@@ -111,10 +112,25 @@ def _upsert_schema_entry(user_id: str, project_id: str, schema: dict | None, fil
 
 @router.get("/{project_id}/")
 def list_files(project_id: str, path: str = "", user: UserInDB = Depends(get_current_user)):
-    rel_path = _normalize_relative_path(path)
+    from backend.core.minio_store import list_all_project_files
+    all_files = list_all_project_files(user.user_id, project_id=project_id)
+    
+    datasets = []
+    exports = []
+    
+    for f in all_files:
+        path_str = f["path"]
+        suffix = Path(path_str).suffix.lower()
+        if path_str.startswith("exports/"):
+            if suffix:
+                exports.append(f)
+        else:
+            if suffix in ALLOWED_EXTENSIONS:
+                datasets.append(f)
+            
     return {
-        "path": rel_path,
-        "files": list_user_objects(user.user_id, rel_path, project_id=project_id),
+        "datasets": datasets,
+        "exports": exports,
     }
 
 
@@ -222,3 +238,58 @@ def preview_file(project_id: str, filename: str, rows: int = 30, user: UserInDB 
         raise
     except Exception as e:
         raise HTTPException(500, f"Gagal membaca file: {str(e)}")
+
+
+from pydantic import BaseModel
+
+class QueryRequest(BaseModel):
+    dataset_name: str
+    query: str
+
+@router.post("/{project_id}/query")
+def query_dataset(
+    project_id: str,
+    payload: QueryRequest,
+    user: UserInDB = Depends(get_current_user)
+):
+    dataset_name = payload.dataset_name
+    query = payload.query
+    
+    _validate_name(dataset_name)
+    rel_path = _normalize_relative_path(dataset_name)
+    if not rel_path or not object_exists(user.user_id, rel_path, project_id=project_id):
+        raise HTTPException(404, f"Dataset {dataset_name} tidak ditemukan")
+        
+    ext = Path(rel_path).suffix.lower()
+    try:
+        data_bytes = get_object_bytes(user.user_id, rel_path, project_id=project_id)
+        buf = io.BytesIO(data_bytes)
+        if ext == ".csv":
+            df = pd.read_csv(buf)
+        elif ext in (".xlsx", ".xls"):
+            df = pd.read_excel(buf)
+        elif ext == ".json":
+            df = pd.read_json(buf)
+        elif ext == ".parquet":
+            df = pd.read_parquet(buf)
+        else:
+            raise HTTPException(400, f"Format tidak didukung: {ext}")
+            
+        query = re.sub(r'`([^`]+)`', r'"\1"', query)
+
+        import duckdb
+        con = duckdb.connect()
+        con.register("dataset", df)
+
+        res_df = con.execute(query).df()
+        
+        # Clean NaN/Inf values so they are JSON-serializable
+        res_df = res_df.fillna("")
+        
+        return {
+            "columns": res_df.columns.tolist(),
+            "data": res_df.astype(str).values.tolist(),
+            "total_rows": len(res_df)
+        }
+    except Exception as e:
+        raise HTTPException(400, f"Gagal mengeksekusi query: {str(e)}")

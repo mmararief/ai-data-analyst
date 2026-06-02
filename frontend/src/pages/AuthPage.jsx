@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
-import Logo from '../components/Logo'
 
 // ── Eye icon ──────────────────────────────────────────────────────────────────
 function EyeIcon({ open }) {
@@ -17,15 +16,14 @@ function EyeIcon({ open }) {
   )
 }
 
-// ── Animated canvas background removed for clean UI ────────────────────────
 const DEMO_LINES = [
-  { prefix: '> ', text: 'prediksi churn customers.csv', color: '#e2e8f0' },
-  { prefix: '  ✓ ', text: 'Planner: 3 tasks, 2 phases', color: '#38bdf8' },
-  { prefix: '  ✓ ', text: 'EDA: distribusi & korelasi', color: '#86efac' },
-  { prefix: '  ✓ ', text: 'Critic: judgment = ok', color: '#86efac' },
-  { prefix: '> ', text: 'visualisasi korelasi features', color: '#e2e8f0' },
-  { prefix: '  ✓ ', text: 'Chart saved: _chart_ab3f.png', color: '#38bdf8' },
-  { prefix: '> ', text: '_', color: '#38bdf8' },
+  { prefix: '> ', text: 'prediksi churn customers.csv', color: 'var(--text-primary)' },
+  { prefix: '  ✓ ', text: 'Planner: 3 tasks, 2 phases', color: 'var(--analisai-cyan)' },
+  { prefix: '  ✓ ', text: 'EDA: distribusi & korelasi', color: '#10b981' },
+  { prefix: '  ✓ ', text: 'Critic: judgment = ok', color: '#10b981' },
+  { prefix: '> ', text: 'visualisasi korelasi features', color: 'var(--text-primary)' },
+  { prefix: '  ✓ ', text: 'Chart saved: _chart_ab3f.png', color: 'var(--analisai-cyan)' },
+  { prefix: '> ', text: '_', color: 'var(--analisai-cyan)' },
 ]
 
 function TerminalLines() {
@@ -48,7 +46,7 @@ function TerminalLines() {
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: '0.72rem',
         lineHeight: 2,
-        color: '#475569',
+        color: 'var(--text-secondary)',
       }}
     >
       {DEMO_LINES.slice(0, shown).map((line, i) => (
@@ -60,13 +58,13 @@ function TerminalLines() {
             color: line.color,
           }}
         >
-          <span style={{ color: '#475569' }}>{line.prefix}</span>
+          <span style={{ color: 'var(--text-muted)' }}>{line.prefix}</span>
           {line.text}
           {i === shown - 1 && line.text === '_' && (
             <span style={{
               display: 'inline-block',
               width: 7, height: 13,
-              background: '#38bdf8',
+              background: 'var(--analisai-cyan)',
               verticalAlign: 'text-bottom',
               animation: 'blink 1s step-end infinite',
             }} />
@@ -77,7 +75,6 @@ function TerminalLines() {
   )
 }
 
-// ── Input field component ─────────────────────────────────────────────────────
 function AuthInput({ label, type, placeholder, value, onChange, required, rightEl, autoFocus }) {
   const [focused, setFocused] = useState(false)
 
@@ -88,7 +85,7 @@ function AuthInput({ label, type, placeholder, value, onChange, required, rightE
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: '0.62rem',
         letterSpacing: '0.12em',
-        color: focused ? '#38bdf8' : '#475569',
+        color: focused ? 'var(--analisai-cyan)' : 'var(--text-secondary)',
         marginBottom: '0.5rem',
         textTransform: 'uppercase',
         transition: 'color 0.2s',
@@ -105,16 +102,19 @@ function AuthInput({ label, type, placeholder, value, onChange, required, rightE
           autoFocus={autoFocus}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          className="auth-input-placeholder"
           style={{
             width: '100%',
-            background: 'rgba(255,255,255,0.03)',
-            border: `1px solid ${focused ? 'rgba(56,189,248,0.5)' : 'rgba(255,255,255,0.08)'}`,
+            background: 'var(--bg-input)',
+            border: `1px solid ${focused ? 'var(--analisai-cyan)' : 'var(--border-primary)'}`,
             borderRadius: 10,
             padding: rightEl ? '0.8rem 2.8rem 0.8rem 1rem' : '0.8rem 1rem',
             fontFamily: "sans-serif",
+            fontSize: '0.9rem',
+            color: 'var(--text-primary)',
             outline: 'none',
             transition: 'border-color 0.2s, box-shadow 0.2s',
-            boxShadow: focused ? '0 0 0 3px rgba(56,189,248,0.08), inset 0 0 20px rgba(56,189,248,0.02)' : 'none',
+            boxShadow: focused ? '0 0 0 3px rgba(56,189,248,0.1)' : 'none',
           }}
         />
         {rightEl && (
@@ -130,7 +130,6 @@ function AuthInput({ label, type, placeholder, value, onChange, required, rightE
   )
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
 export default function AuthPage({ onLogin }) {
   const navigate = useNavigate()
   const [mode, setMode] = useState('login')
@@ -197,30 +196,33 @@ export default function AuthPage({ onLogin }) {
       <style>{`
         @keyframes fadeInUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
         @keyframes spin { to{transform:rotate(360deg)} }
+        @keyframes termLine { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes blink { 0%, 100% {opacity:1} 50% {opacity:0} }
 
-        .auth-input-placeholder::placeholder { color: #334155; }
+        .auth-input-placeholder::placeholder { color: var(--text-muted); opacity: 0.6; }
 
         .auth-submit-btn:hover:not(:disabled) {
           transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(11,87,208,0.2);
         }
         .auth-submit-btn:active:not(:disabled) { transform: translateY(0); }
 
-        .mode-toggle-btn:hover { color: #7dd3fc !important; }
+        .mode-toggle-btn:hover { color: var(--analisai-cyan2) !important; }
 
-        .back-btn:hover { color: #94a3b8 !important; }
+        .back-btn:hover { color: var(--text-primary) !important; }
         .back-btn:hover svg { transform: translateX(-3px); }
         .back-btn svg { transition: transform 0.2s; }
 
         .feature-tag { transition: border-color 0.2s, background 0.2s; }
         .feature-tag:hover {
-          border-color: rgba(56,189,248,0.3) !important;
-          background: rgba(56,189,248,0.06) !important;
+          border-color: rgba(11,87,208,0.3) !important;
+          background: rgba(11,87,208,0.06) !important;
         }
       `}</style>
 
       <div style={{
         minHeight: '100vh',
-        background: '#020617', // slate-950
+        background: 'var(--bg-page)',
         display: 'flex',
         justifyContent: 'center',
         fontFamily: "sans-serif",
@@ -231,11 +233,22 @@ export default function AuthPage({ onLogin }) {
           flex: 1,
           display: 'none',
           position: 'relative',
-          borderRight: '1px solid rgba(255,255,255,0.06)',
+          borderRight: '1px solid var(--border-primary)',
+          background: 'var(--bg-secondary)',
           overflow: 'hidden',
         }} className="lg:block" >
 
-          {/* Clean background area */}
+          {/* Subtle grid background */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            backgroundImage: `
+              linear-gradient(rgba(11,87,208,0.03) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(11,87,208,0.03) 1px, transparent 1px)
+            `,
+            backgroundSize: '40px 40px',
+            maskImage: 'radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 100%)',
+            WebkitMaskImage: 'radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 100%)'
+          }} />
 
           {/* Content */}
           <div style={{
@@ -249,11 +262,11 @@ export default function AuthPage({ onLogin }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
               <div style={{
                 width: 32, height: 32, borderRadius: 8,
-                background: '#0284c7',
+                background: 'var(--analisai-cyan)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 14, fontWeight: 800, color: 'white'
+                fontSize: 14, fontWeight: 800, color: '#fff'
               }}>A</div>
-              <span style={{ fontSize: '1rem', fontWeight: 700, color: '#f0f9ff', letterSpacing: '-0.02em' }}>
+              <span style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-heading)', letterSpacing: '-0.02em' }}>
                 Analisai
               </span>
             </div>
@@ -264,16 +277,16 @@ export default function AuthPage({ onLogin }) {
                 display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
                 fontFamily: "'JetBrains Mono', monospace",
                 fontSize: '0.65rem', letterSpacing: '0.12em',
-                color: '#38bdf8',
-                background: 'rgba(56,189,248,0.08)',
-                border: '1px solid rgba(56,189,248,0.2)',
+                color: 'var(--analisai-cyan)',
+                background: 'rgba(11,87,208,0.08)',
+                border: '1px solid rgba(11,87,208,0.2)',
                 padding: '0.35rem 0.8rem', borderRadius: 100,
                 marginBottom: '1.5rem',
               }}>
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
-                  background: '#38bdf8',
-                  boxShadow: '0 0 8px #38bdf8',
+                  background: 'var(--analisai-cyan)',
+                  boxShadow: '0 0 8px var(--analisai-cyan)',
                   animation: 'blink 2s ease-in-out infinite',
                 }} />
                 LIVE · 3-AGENT PIPELINE
@@ -283,13 +296,13 @@ export default function AuthPage({ onLogin }) {
                 fontSize: 'clamp(1.8rem, 3vw, 2.6rem)',
                 fontWeight: 800,
                 letterSpacing: '-0.03em',
-                color: '#f0f9ff',
+                color: 'var(--text-heading)',
                 lineHeight: 1.1,
                 marginBottom: '1rem',
               }}>
                 Analisis data<br />
                 <span style={{
-                  background: 'linear-gradient(135deg, #38bdf8, #818cf8)',
+                  background: 'linear-gradient(135deg, var(--analisai-cyan), #818cf8)',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   backgroundClip: 'text',
@@ -297,24 +310,25 @@ export default function AuthPage({ onLogin }) {
               </h2>
 
               <p style={{
-                color: '#475569', fontSize: '0.88rem',
+                color: 'var(--text-secondary)', fontSize: '0.88rem',
                 lineHeight: 1.7, marginBottom: '2rem',
                 maxWidth: 340,
               }}>
-                Dari eksplorasi data hingga model ML production-ready — cukup dengan bahasa natural.
+                Dari eksplorasi data hingga pelaporan mendalam — berinteraksi dengan dataset menggunakan bahasa natural.
               </p>
 
               {/* Terminal */}
               <div style={{
-                background: '#080c16',
-                border: '1px solid rgba(255,255,255,0.07)',
+                background: 'var(--bg-code)',
+                border: '1px solid var(--border-primary)',
                 borderRadius: 12, overflow: 'hidden',
                 marginBottom: '2rem',
+                boxShadow: 'var(--shadow-md)',
               }}>
                 <div style={{
-                  background: '#0a0e1a',
+                  background: 'var(--bg-tertiary)',
                   padding: '0.65rem 1rem',
-                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  borderBottom: '1px solid var(--border-primary)',
                   display: 'flex', alignItems: 'center', gap: '0.4rem',
                 }}>
                   <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff5f57' }} />
@@ -322,7 +336,7 @@ export default function AuthPage({ onLogin }) {
                   <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#28c840' }} />
                   <span style={{
                     fontFamily: "'JetBrains Mono', monospace",
-                    fontSize: '0.62rem', color: '#334155',
+                    fontSize: '0.62rem', color: 'var(--text-muted)',
                     marginLeft: '0.5rem', letterSpacing: '0.06em',
                   }}>analisai · terminal</span>
                 </div>
@@ -333,13 +347,13 @@ export default function AuthPage({ onLogin }) {
 
               {/* Feature tags */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {['EDA', 'LangGraph', 'Docker Sandbox', 'Streaming', 'ML Pipeline'].map(tag => (
+                {['EDA', 'Agentic Workflow', 'Python Sandbox', 'Streaming'].map(tag => (
                   <div key={tag} className="feature-tag" style={{
                     fontFamily: "'JetBrains Mono', monospace",
                     fontSize: '0.62rem', letterSpacing: '0.08em',
-                    color: '#475569',
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.06)',
+                    color: 'var(--text-secondary)',
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-primary)',
                     padding: '0.3rem 0.7rem', borderRadius: 6,
                     cursor: 'default',
                   }}>
@@ -352,10 +366,10 @@ export default function AuthPage({ onLogin }) {
             {/* Bottom */}
             <div style={{
               fontFamily: "'JetBrains Mono', monospace",
-              fontSize: '0.62rem', color: '#1e293b',
+              fontSize: '0.62rem', color: 'var(--text-muted)',
               letterSpacing: '0.08em',
             }}>
-              © 2025 ANALISAI · MUHAMMAD AMMAR ARIEF
+              © 2026 ANALISAI
             </div>
           </div>
         </div>
@@ -380,7 +394,7 @@ export default function AuthPage({ onLogin }) {
             style={{
               position: 'absolute', top: '1.5rem', left: '1.5rem',
               display: 'flex', alignItems: 'center', gap: '0.4rem',
-              color: '#334155', background: 'none', border: 'none',
+              color: 'var(--text-muted)', background: 'none', border: 'none',
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: '0.65rem', letterSpacing: '0.08em',
               cursor: 'pointer', transition: 'color 0.2s',
@@ -404,22 +418,23 @@ export default function AuthPage({ onLogin }) {
               {/* Logo mark */}
               <div style={{
                 width: 52, height: 52, borderRadius: 14,
-                background: '#0284c7',
+                background: 'var(--analisai-cyan)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 22, fontWeight: 800, color: 'white',
-                margin: '0 auto 1.25rem'
+                fontSize: 22, fontWeight: 800, color: '#fff',
+                margin: '0 auto 1.25rem',
+                boxShadow: '0 4px 14px rgba(11,87,208,0.15)'
               }}>A</div>
 
               <h1 style={{
                 fontSize: '1.6rem', fontWeight: 800,
-                color: '#f0f9ff', letterSpacing: '-0.03em',
+                color: 'var(--text-heading)', letterSpacing: '-0.03em',
                 marginBottom: '0.35rem',
               }}>
                 {mode === 'login' ? 'Selamat datang' : 'Buat akun baru'}
               </h1>
               <p style={{
                 fontFamily: "'JetBrains Mono', monospace",
-                fontSize: '0.68rem', color: '#334155',
+                fontSize: '0.68rem', color: 'var(--text-muted)',
                 letterSpacing: '0.08em',
               }}>
                 {mode === 'login' ? '— MASUK KE ANALISAI —' : '— DAFTAR GRATIS —'}
@@ -451,11 +466,11 @@ export default function AuthPage({ onLogin }) {
                     onClick={() => setShowPassword(v => !v)}
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
-                      color: '#334155', padding: 0, display: 'flex',
+                      color: 'var(--text-muted)', padding: 0, display: 'flex',
                       transition: 'color 0.2s',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#38bdf8'}
-                    onMouseLeave={e => e.currentTarget.style.color = '#334155'}
+                    onMouseEnter={e => e.currentTarget.style.color = 'var(--analisai-cyan)'}
+                    onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
                   >
                     <EyeIcon open={showPassword} />
                   </button>
@@ -479,11 +494,11 @@ export default function AuthPage({ onLogin }) {
                         onClick={() => setShowConfirm(v => !v)}
                         style={{
                           background: 'none', border: 'none', cursor: 'pointer',
-                          color: '#334155', padding: 0, display: 'flex',
+                          color: 'var(--text-muted)', padding: 0, display: 'flex',
                           transition: 'color 0.2s',
                         }}
-                        onMouseEnter={e => e.currentTarget.style.color = '#38bdf8'}
-                        onMouseLeave={e => e.currentTarget.style.color = '#334155'}
+                        onMouseEnter={e => e.currentTarget.style.color = 'var(--analisai-cyan)'}
+                        onMouseLeave={e => e.currentTarget.style.color = 'var(--text-muted)'}
                       >
                         <EyeIcon open={showConfirm} />
                       </button>
@@ -500,13 +515,13 @@ export default function AuthPage({ onLogin }) {
                   fontFamily: "'JetBrains Mono', monospace",
                   fontSize: '0.7rem', letterSpacing: '0.04em',
                   ...(success ? {
-                    background: 'rgba(34,197,94,0.07)',
-                    border: '1px solid rgba(34,197,94,0.2)',
-                    color: '#86efac',
+                    background: 'rgba(16,185,129,0.1)',
+                    border: '1px solid rgba(16,185,129,0.2)',
+                    color: '#10b981',
                   } : {
-                    background: 'rgba(239,68,68,0.07)',
+                    background: 'rgba(239,68,68,0.1)',
                     border: '1px solid rgba(239,68,68,0.2)',
-                    color: '#fca5a5',
+                    color: '#ef4444',
                   }),
                   animation: 'fadeInUp 0.2s ease both',
                   display: 'flex', alignItems: 'center', gap: '0.5rem',
@@ -522,17 +537,17 @@ export default function AuthPage({ onLogin }) {
                 disabled={loading}
                 className="auth-submit-btn"
                 style={{
-                  width: '100%', height: 50, marginTop: '0.5rem',
-                  background: loading ? '#0ea5e988' : '#0284c7',
+                  width: '100%', height: 48, marginTop: '0.5rem',
+                  background: loading ? 'var(--analisai-cyan2)' : 'var(--analisai-cyan)',
                   border: 'none', borderRadius: 10,
-                  color: 'white', fontFamily: "sans-serif",
-                  fontSize: '0.9rem', fontWeight: 700,
-                  letterSpacing: '0.01em',
+                  color: '#fff', fontFamily: "sans-serif",
+                  fontSize: '0.9rem', fontWeight: 600,
                   cursor: loading ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                  transition: 'transform 0.15s, background 0.2s',
+                  transition: 'transform 0.15s, background 0.2s, box-shadow 0.2s',
                   position: 'relative', overflow: 'hidden',
                   opacity: loading ? 0.7 : 1,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
                 }}
               >
                 <span style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -562,20 +577,20 @@ export default function AuthPage({ onLogin }) {
               display: 'flex', alignItems: 'center', gap: '1rem',
               margin: '1.5rem 0',
             }}>
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
+              <div style={{ flex: 1, height: 1, background: 'var(--border-primary)' }} />
               <span style={{
                 fontFamily: "'JetBrains Mono', monospace",
-                fontSize: '0.6rem', color: '#1e293b',
+                fontSize: '0.6rem', color: 'var(--text-muted)',
                 letterSpacing: '0.1em',
-              }}>OR</span>
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
+              }}>ATAU</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--border-primary)' }} />
             </div>
 
             {/* Toggle mode */}
             <p style={{
               textAlign: 'center',
               fontFamily: "'JetBrains Mono', monospace",
-              fontSize: '0.7rem', color: '#334155',
+              fontSize: '0.7rem', color: 'var(--text-secondary)',
               letterSpacing: '0.04em',
             }}>
               {mode === 'login' ? 'BELUM PUNYA AKUN?' : 'SUDAH PUNYA AKUN?'}{' '}
@@ -584,8 +599,8 @@ export default function AuthPage({ onLogin }) {
                 onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: '#38bdf8', fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: '0.7rem', fontWeight: 500,
+                  color: 'var(--analisai-cyan)', fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: '0.7rem', fontWeight: 600,
                   letterSpacing: '0.04em', textDecoration: 'underline',
                   textUnderlineOffset: 3,
                   transition: 'color 0.2s',

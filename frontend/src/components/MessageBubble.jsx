@@ -38,12 +38,12 @@ function TypingIndicator() {
         <span className="typing-dot" />
         <span className="typing-dot" />
       </div>
-      <span className="text-xs text-[var(--text-muted)]">Menganalisis data...</span>
+      <span className="text-xs text-[var(--text-muted)]">Berfikir...</span>
     </div>
   )
 }
 
-export default function MessageBubble({ message, isLoading, statusText, allMessages, projectId, isLastMessage, onApprovePlan, onSelectOption, onSubmitClarification, computerPanelOpen }) {
+export default function MessageBubble({ message, isLoading, statusText, allMessages, projectId, isLastMessage, onApprovePlan, onSelectOption, onSubmitClarification, computerPanelOpen, selectedStepIndex, onSelectCodeStep }) {
   const isUser = message.role === 'user'
   const isEmpty = !message.parts?.length && !message.codeSteps?.length
   const [nbLoading, setNbLoading] = useState(false)
@@ -65,24 +65,37 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
   }
 
   const buildOrderedParts = () => {
-    const parts = message.parts || (message.content ? [{ type: 'text', content: message.content }] : [])
+    let parts = message.parts || (message.content ? [{ type: 'text', content: message.content }] : [])
+
     const steps = message.codeSteps || []
 
     const nonInsightParts = parts.filter(p => p.type !== 'insight')
     const insightPart = parts.find(p => p.type === 'insight')
 
-    // Check if parts array has any 'code_step' (new format)
     const hasCodeStepRefs = nonInsightParts.some(p => p.type === 'code_step')
 
     const ordered = []
 
     if (hasCodeStepRefs) {
-      // New logic: interleave exactly as they were pushed
       let currentStepsGroup = []
       for (const part of nonInsightParts) {
-        if (part.type === 'code_step') {
-          if (steps[part.stepIndex]) {
-            currentStepsGroup.push(steps[part.stepIndex])
+        if (part.type === 'code_step' || part.type === 'task_start') {
+          if (part.type === 'code_step') {
+            if (steps[part.stepIndex]) {
+              currentStepsGroup.push({ 
+                type: 'code_step',
+                ...steps[part.stepIndex], 
+                globalIndex: part.stepIndex 
+              })
+            }
+          } else {
+            currentStepsGroup.push({
+              type: 'task_start',
+              content: part.content,
+              index: part.index,
+              total: part.total,
+              agent: part.agent
+            })
           }
         } else {
           if (currentStepsGroup.length > 0) {
@@ -96,7 +109,6 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
         ordered.push({ type: 'steps', value: currentStepsGroup })
       }
     } else {
-      // Legacy logic for backward compatibility
       if (steps.length === 0) {
         const legacyOrdered = nonInsightParts.map(p => ({ type: 'part', value: p }))
         if (insightPart) legacyOrdered.push({ type: 'part', value: insightPart })
@@ -109,7 +121,7 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
       const groupSteps = () => {
         const currentGroup = []
         while (stepIdx < steps.length) {
-          currentGroup.push(steps[stepIdx])
+          currentGroup.push({ ...steps[stepIdx], globalIndex: stepIdx, type: 'code_step' })
           stepIdx++
         }
         if (currentGroup.length > 0) {
@@ -151,8 +163,12 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
       ) : (
         <div className="space-y-0.5">
           <div className="flex gap-3">
-            <div className="w-7 h-7 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center shrink-0 mt-1">
-              <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+            <div className="w-7 h-7 rounded-full bg-[#3880ff] flex items-center justify-center shrink-0 mt-1 shadow-sm select-none">
+              {/* Kimi face avatar */}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="translate-y-[0.5px]">
+                <ellipse cx="8" cy="12" rx="2" ry="5.5" fill="white" />
+                <ellipse cx="16" cy="12" rx="2" ry="5.5" fill="white" />
+              </svg>
             </div>
 
             <div className="flex-1 min-w-0 space-y-2 pb-1">
@@ -179,26 +195,14 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
                         onSelectOption={onSelectOption}
                         onSubmitClarification={onSubmitClarification}
                       />
-                    ) : computerPanelOpen ? (
-                      /* Simplified tool call indicator when panel is open */
-                      <div key={i} className="flex items-center gap-2 py-1.5 px-2 my-1 rounded-md" style={{
-                        background: 'var(--bg-hover)',
-                        border: '1px solid var(--border-light)',
-                      }}>
-                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#38bdf8">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                        </svg>
-                        <span className="text-[11px]" style={{ color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
-                          {item.value.length} langkah analisis
-                        </span>
-                        <span className="text-[10px]" style={{ color: 'rgba(56,189,248,0.6)' }}>→ Panel Komputer</span>
-                      </div>
                     ) : (
                       <ToolCallGroup
                         key={i}
                         steps={item.value}
                         isLoading={isLoading}
                         projectId={projectId}
+                        selectedIndex={selectedStepIndex}
+                        onSelectStep={onSelectCodeStep}
                       />
                     )
                   )}
@@ -214,22 +218,7 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
                     </div>
                   )}
 
-                  {!isLoading && steps.length > 0 && (
-                    <div className="pt-2 flex items-center gap-3 border-t border-[var(--border-light)]">
-                      <button
-                        onClick={handleDownloadNotebook}
-                        disabled={nbLoading}
-                        className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--analisai-cyan)] disabled:opacity-50 transition-colors"
-                      >
-                        {nbLoading ? (
-                          <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Menyusun notebook...</>
-                        ) : (
-                          <><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Download .ipynb</>
-                        )}
-                      </button>
-                      {nbError && <span className="text-[11px] text-red-400">{nbError}</span>}
-                    </div>
-                  )}
+
                 </>
               )}
             </div>

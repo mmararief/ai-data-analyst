@@ -1,42 +1,41 @@
 import { useState } from 'react'
 
 const tabContents = {
-  planner: [
-    { type: 'comment', text: '# pertanyaan pengguna' },
-    { type: 'key', text: 'question' }, { type: 'op', text: ' = ' }, { type: 'str', text: '"prediksi churn pada customers.csv"' },
+  agent: [
+    { type: 'comment', text: '# asisten AI menganalisis kueri & merencanakan tugas' },
+    { type: 'key', text: 'query' }, { type: 'op', text: ' = ' }, { type: 'str', text: '"analisis penjualan terlaris di sales.csv"' },
     { type: '', text: '\u00A0' },
-    { type: 'comment', text: '# planner agent' },
-    { type: 'fn', text: 'plan' }, { type: 'op', text: ' = [' },
-    { type: '', text: '\u00A0 ' }, { type: 'op', text: '{' }, { type: 'key', text: '"task"' }, { type: 'op', text: ': ' }, { type: 'str', text: '"profiling dataset"' }, { type: 'op', text: ', ' }, { type: 'key', text: '"phase"' }, { type: 'op', text: ': ' }, { type: 'val', text: '0' }, { type: 'op', text: '},' },
-    { type: '', text: '\u00A0 ' }, { type: 'op', text: '{' }, { type: 'key', text: '"task"' }, { type: 'op', text: ': ' }, { type: 'str', text: '"analisis distribusi"' }, { type: 'op', text: ', ' }, { type: 'key', text: '"phase"' }, { type: 'op', text: ': ' }, { type: 'val', text: '1' }, { type: 'op', text: '},' },
-    { type: 'op', text: ']' },
+    { type: 'comment', text: '# update to-do list widget' },
+    { type: 'fn', text: 'update_task_list_tool' }, { type: 'op', text: '([' },
+    { type: '', text: '\u00A0 ' }, { type: 'str', text: '"Inspeksi struktur data"' }, { type: 'op', text: ', ' },
+    { type: '', text: '\u00A0 ' }, { type: 'str', text: '"Analisis penjualan bulanan"' },
+    { type: 'op', text: '])' },
+    { type: '', text: '\u00A0' },
+    { type: 'comment', text: '# memanggil tool pembaca data pertama kali' },
+    { type: 'fn', text: 'read_data_tool' }, { type: 'op', text: '(' }, { type: 'str', text: '"/app/data/sales.csv"' }, { type: 'op', text: ')' },
   ],
-  executor: [
-    { type: 'comment', text: '# executor running phase 1' },
-    { type: 'key', text: 'tasks' }, { type: 'op', text: ' = ' }, { type: 'fn', text: 'run_phase_parallel' }, { type: 'op', text: '(generators)' },
-    { type: '', text: '\u00A0' },
-    { type: 'comment', text: '# tool calls' },
+  sandbox: [
+    { type: 'comment', text: '# mengeksekusi analisis di sandbox docker terisolasi' },
     { type: 'fn', text: 'python_repl_tool' }, { type: 'op', text: '(' },
     { type: '', text: '\u00A0 ' }, { type: 'str', text: '"import pandas as pd"' }, { type: 'op', text: ',' },
-    { type: '', text: '\u00A0 ' }, { type: 'str', text: '"df = pd.read_csv(\'customers.csv\')"' }, { type: 'op', text: ',' },
-    { type: '', text: '\u00A0 ' }, { type: 'str', text: '"df.describe()"' },
+    { type: '', text: '\u00A0 ' }, { type: 'str', text: '"df = pd.read_csv(\'/app/data/sales.csv\')"' }, { type: 'op', text: ',' },
+    { type: '', text: '\u00A0 ' }, { type: 'str', text: '"print(df.groupby(\'kategori\')[\'total\'].sum())"' },
     { type: 'op', text: ')' },
     { type: '', text: '\u00A0' },
-    { type: 'key', text: 'rows' }, { type: 'op', text: '    = ' }, { type: 'val', text: '10,423' },
-    { type: 'key', text: 'columns' }, { type: 'op', text: ' = ' }, { type: 'val', text: '12' },
+    { type: 'comment', text: '# membuat visualisasi grafik secara aman' },
+    { type: 'fn', text: 'render_chart_tool' }, { type: 'op', text: '(' },
+    { type: '', text: '\u00A0 ' }, { type: 'key', text: 'chart_type' }, { type: 'op', text: '=' }, { type: 'str', text: '"bar"' }, { type: 'op', text: ',' },
+    { type: '', text: '\u00A0 ' }, { type: 'key', text: 'x' }, { type: 'op', text: '=' }, { type: 'str', text: '"kategori"' },
+    { type: 'op', text: ')' },
   ],
-  critic: [
-    { type: 'comment', text: '# critic agent evaluation' },
-    { type: 'fn', text: 'judgment' }, { type: 'op', text: ' = ' }, { type: 'fn', text: 'run_critic_agent' }, { type: 'op', text: '(' },
-    { type: '', text: '\u00A0 ' }, { type: 'key', text: 'question' }, { type: 'op', text: ',' }, { type: 'key', text: 'execution_output' },
-    { type: 'op', text: ')' },
+  output: [
+    { type: 'comment', text: '# asisten memberikan ringkasan analisis' },
+    { type: 'key', text: 'hasil_analisis' }, { type: 'op', text: ' = ' }, { type: 'str', text: '"kategori Electronics memimpin dengan total Rp 156jt (34.4%)."' },
     { type: '', text: '\u00A0' },
-    { type: 'comment', text: '# result' },
-    { type: 'key', text: 'judgment' }, { type: 'op', text: ' = ' }, { type: 'val', text: '"ok"' },
-    { type: 'key', text: 'feedback' }, { type: 'op', text: ' = ' }, { type: 'str', text: '"analisis sudah lengkap"' },
-    { type: 'key', text: 'additional_tasks' }, { type: 'op', text: ' = ' }, { type: 'op', text: '[]' },
+    { type: 'comment', text: '# pertanyaan follow-up di akhir respons' },
+    { type: 'key', text: 'follow_up' }, { type: 'op', text: ' = ' }, { type: 'str', text: '"Apakah Anda ingin melihat korelasi antara harga dan kuantitas, atau membuat dashboard?"' },
     { type: '', text: '\u00A0' },
-    { type: 'comment', text: '# pipeline selesai ✓' },
+    { type: 'comment', text: '# analisis selesai dan siap disajikan ✓' },
   ]
 }
 
@@ -50,7 +49,7 @@ const styles = {
 }
 
 export default function TerminalMockup() {
-  const [activeTab, setActiveTab] = useState('planner')
+  const [activeTab, setActiveTab] = useState('agent')
 
   return (
     <div className="bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
