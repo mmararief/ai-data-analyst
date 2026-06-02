@@ -8,6 +8,7 @@ from pathlib import Path
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
+from langgraph.checkpoint.memory import MemorySaver
 
 from backend.agent.llm import build_llm
 from backend.agent.prompts import build_system_prompt
@@ -253,102 +254,137 @@ def create_agent(
         exports_folder = data_folder / "exports"
         exports_folder.mkdir(exist_ok=True)
 
-        if fmt == "ipynb":
-            # Cek apakah konten sudah berupa JSON notebook yang valid
-            try:
-                parsed_content = json.loads(content)
-                if isinstance(parsed_content, dict) and "cells" in parsed_content:
-                    out_path = exports_folder / f"{fname}.ipynb"
-                    out_path.write_text(json.dumps(parsed_content, ensure_ascii=False, indent=2), encoding="utf-8")
-                    _push(f"📄 File diekspor: exports/{out_path.name}")
-                    return json.dumps({
-                        "type": "file_export",
-                        "filename": f"exports/{out_path.name}",
-                        "format": fmt,
-                        "size_bytes": out_path.stat().st_size,
-                    }, ensure_ascii=False)
-            except Exception:
-                pass
+        # Write content to a temporary file in the sandbox folder
+        import uuid
+        temp_id = str(uuid.uuid4())
+        temp_input_path = data_folder / f"temp_input_{temp_id}.txt"
+        with open(temp_input_path, "w", encoding="utf-8") as f:
+            f.write(content)
 
-            cells = []
-            code_block_re = re.compile(r"```(?:python)?\n(.*?)```", re.DOTALL)
-            parts = code_block_re.split(content)
-            for i, part in enumerate(parts):
-                text = part.strip()
-                if not text:
-                    continue
-                if i % 2 == 1:
-                    cells.append({
-                        "cell_type": "code",
-                        "execution_count": None,
-                        "metadata": {},
-                        "outputs": [],
-                        "source": [ln + "\n" for ln in text.split("\n")],
-                    })
-                else:
-                    cells.append({
-                        "cell_type": "markdown",
-                        "metadata": {},
-                        "source": [ln + "\n" for ln in text.split("\n")],
-                    })
+        # Execute export logic inside sandbox
+        script_code = f"""
+import os
+import json
+import re
 
-            notebook = {
-                "nbformat": 4,
-                "nbformat_minor": 5,
-                "metadata": {
-                    "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
-                    "language_info": {"name": "python", "version": "3.10.0"},
-                },
-                "cells": cells or [{"cell_type": "markdown", "metadata": {}, "source": [content]}],
-            }
-            out_path = exports_folder / f"{fname}.ipynb"
-            out_path.write_text(json.dumps(notebook, ensure_ascii=False, indent=2), encoding="utf-8")
+data_dir = '/app/data/exports'
+os.makedirs(data_dir, exist_ok=True)
+fmt = '{fmt}'
+fname = '{fname}'
+temp_input = '/app/data/temp_input_{temp_id}.txt'
 
-        elif fmt == "xlsx":
-            try:
-                import io
-                import pandas as pd
-                try:
-                    df = pd.read_csv(io.StringIO(content))
-                except Exception:
-                    lines = [line.split(",") for line in content.strip().splitlines()]
-                    if len(lines) > 1:
-                        df = pd.DataFrame(lines[1:], columns=lines[0])
-                    else:
-                        df = pd.DataFrame({"content": content.splitlines()})
-                out_path = exports_folder / f"{fname}.xlsx"
-                df.to_excel(out_path, index=False, engine="openpyxl")
-            except Exception as exc:
-                return json.dumps({
-                    "type": "file_export",
-                    "error": f"Gagal membuat Excel: {exc}",
-                }, ensure_ascii=False)
+with open(temp_input, 'r', encoding='utf-8') as f:
+    content = f.read()
 
-        elif fmt == "json":
-            out_path = exports_folder / f"{fname}.json"
-            try:
-                parsed = json.loads(content)
-                out_path.write_text(json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8")
-            except json.JSONDecodeError:
-                out_path.write_text(content, encoding="utf-8")
+out_path = os.path.join(data_dir, f"{{fname}}.{{fmt}}")
 
-        elif fmt in ("csv", "md", "html", "txt", "py"):
-            out_path = exports_folder / f"{fname}.{fmt}"
-            out_path.write_text(content, encoding="utf-8")
+if fmt == "ipynb":
+    try:
+        parsed_content = json.loads(content)
+        if isinstance(parsed_content, dict) and "cells" in parsed_content:
+            with open(out_path, 'w', encoding='utf-8') as f:
+                json.dump(parsed_content, f, ensure_ascii=False, indent=2)
+            print(f"DONE:{{out_path}}")
+            exit(0)
+    except Exception:
+        pass
 
+    cells = []
+    code_block_re = re.compile(r"```(?:python)?\n(.*?)```", re.DOTALL)
+    parts = code_block_re.split(content)
+    for i, part in enumerate(parts):
+        text = part.strip()
+        if not text:
+            continue
+        if i % 2 == 1:
+            cells.append({{
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {{}},
+                "outputs": [],
+                "source": [ln + "\n" for ln in text.split("\n")],
+            }})
         else:
+            cells.append({{
+                "cell_type": "markdown",
+                "metadata": {{}},
+                "source": [ln + "\n" for ln in text.split("\n")],
+            }})
+
+    notebook = {{
+        "nbformat": 4,
+        "nbformat_minor": 5,
+        "metadata": {{
+            "kernelspec": {{"display_name": "Python 3", "language": "python", "name": "python3"}},
+            "language_info": {{"name": "python", "version": "3.10.0"}},
+        }},
+        "cells": cells or [{{"cell_type": "markdown", "metadata": {{}}, "source": [content]}}],
+    }}
+    with open(out_path, 'w', encoding='utf-8') as f:
+        json.dump(notebook, f, ensure_ascii=False, indent=2)
+
+elif fmt == "xlsx":
+    try:
+        import io
+        import pandas as pd
+        try:
+            df = pd.read_csv(io.StringIO(content))
+        except Exception:
+            lines = [line.split(",") for line in content.strip().splitlines()]
+            if len(lines) > 1:
+                df = pd.DataFrame(lines[1:], columns=lines[0])
+            else:
+                df = pd.DataFrame({{"content": content.splitlines()}})
+        df.to_excel(out_path, index=False, engine="openpyxl")
+    except Exception as exc:
+        print(f"ERROR:{{exc}}")
+        exit(1)
+
+elif fmt == "json":
+    try:
+        parsed = json.loads(content)
+        with open(out_path, 'w', encoding='utf-8') as f:
+            json.dump(parsed, f, ensure_ascii=False, indent=2)
+    except json.JSONDecodeError:
+        with open(out_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+elif fmt in ("csv", "md", "html", "txt", "py"):
+    with open(out_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+else:
+    print(f"UNSUPPORTED:{{fmt}}")
+    exit(1)
+
+print(f"DONE:{{out_path}}")
+"""
+        output = run_ai_code_securely(script_code, data_folder_path=folder_str)
+
+        # Cleanup temp file
+        if temp_input_path.exists():
+            temp_input_path.unlink()
+
+        if "UNSUPPORTED:" in output:
             return json.dumps({
                 "type": "file_export",
                 "error": f"Format '{fmt}' tidak didukung. Gunakan: ipynb, csv, xlsx, json, md, html, txt, py",
             }, ensure_ascii=False)
+        elif "ERROR:" in output:
+            return json.dumps({
+                "type": "file_export",
+                "error": f"Gagal mengekspor file: {output}",
+            }, ensure_ascii=False)
+
+        out_path = exports_folder / f"{fname}.{fmt}"
 
         _push(f"📄 File diekspor: exports/{out_path.name}")
         return json.dumps({
             "type": "file_export",
             "filename": f"exports/{out_path.name}",
             "format": fmt,
-            "size_bytes": out_path.stat().st_size,
+            "size_bytes": out_path.stat().st_size if out_path.exists() else 0,
         }, ensure_ascii=False)
+
 
     # ── Read Data Tool ─────────────────────────────────────────────────
     @tool
@@ -783,4 +819,5 @@ def create_agent(
         llm,
         tools=tool_list,
         messages_modifier=prompt,
+        checkpointer=MemorySaver(),
     )
