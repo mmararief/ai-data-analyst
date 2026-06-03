@@ -13,6 +13,9 @@ ModuleRegistry.registerModules([AllCommunityModule])
 const buildFilteredQuery = (baseQuery, activeFilters, filtersConfig) => {
   if (!baseQuery) return ''
   
+  // Remove trailing semicolon to allow wrapping in subquery
+  const cleanBaseQuery = baseQuery.trim().replace(/;+$/, '')
+
   const conditions = []
   Object.entries(activeFilters).forEach(([filterId, activeVal]) => {
     const fConfig = filtersConfig?.find(f => f.id === filterId)
@@ -31,10 +34,10 @@ const buildFilteredQuery = (baseQuery, activeFilters, filtersConfig) => {
     }
   })
   
-  if (conditions.length === 0) return baseQuery
+  if (conditions.length === 0) return cleanBaseQuery
   
   const whereClause = conditions.join(' AND ')
-  return `SELECT * FROM (${baseQuery}) AS subquery WHERE ${whereClause}`
+  return `SELECT * FROM (${cleanBaseQuery}) AS subquery WHERE ${whereClause}`
 }
 
 export default function DashboardViewer({ projectId, filename, onClose }) {
