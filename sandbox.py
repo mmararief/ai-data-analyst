@@ -194,14 +194,15 @@ def cleanup_all_sandboxes():
         logger.warning(f"Gagal membersihkan orphan sandboxes: {e}")
 
 
-def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str):
+def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypass_validation: bool = False):
     absolute_data_path = os.path.abspath(data_folder_path)
     lock = _get_lock(absolute_data_path)
     
-    validation_error = _validate_code(ai_generated_code)
-    if validation_error:
-        yield f"\nError: {validation_error}\n"
-        return
+    if not bypass_validation:
+        validation_error = _validate_code(ai_generated_code)
+        if validation_error:
+            yield f"\nError: {validation_error}\n"
+            return
 
     with lock:
         try:
@@ -248,8 +249,8 @@ def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str):
         except Exception as e:
             yield f"Sistem Sandbox gagal: {str(e)}\n"
 
-def run_ai_code_securely(ai_generated_code: str, data_folder_path: str) -> str:
-    return "".join(stream_ai_code_securely(ai_generated_code, data_folder_path))
+def run_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypass_validation: bool = False) -> str:
+    return "".join(stream_ai_code_securely(ai_generated_code, data_folder_path, bypass_validation=bypass_validation))
 
 def run_bash_in_sandbox(command: str, data_folder_path: str) -> str:
     absolute_data_path = os.path.abspath(data_folder_path)

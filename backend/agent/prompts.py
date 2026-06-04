@@ -71,7 +71,7 @@ Dataset di '/app/data/':
           "x": "bulan",
           "y": ["penjualan"]
         }},
-        "query": "SELECT strftime('%Y-%m', tanggal) as bulan, SUM(penjualan) as penjualan, kategori FROM dataset GROUP BY bulan, kategori ORDER BY bulan"
+        "query": "SELECT strftime(CAST(tanggal AS DATE), '%Y-%m') as bulan, SUM(penjualan) as penjualan FROM dataset GROUP BY bulan ORDER BY bulan"
       }}
     ],
     "tables": [
@@ -85,9 +85,8 @@ Dataset di '/app/data/':
   }}
   PENTING — DILARANG MENYERTAKAN PROPERTI "data" DALAM CHARTS MAUPUN TABLES. Semua data harus ditarik dinamis menggunakan kueri SQL dalam properti "query" tersebut.
   PENTING — DILARANG MENGGUNAKAN COMMENT (// atau /* */) DI DALAM JSON. JSON tidak mendukung komentar.
-  PENTING — JANGAN GUNAKAN BACKTICK (`) DALAM KLAUSA QUERY SQL. DuckDB tidak mendukung backtick. Gunakan double quote (") jika perlu meng-quote nama kolom yang mengandung spasi atau karakter khusus. Agar filter interaktif di frontend dapat menyaring data grafik secara akurat, setiap kueri SQL grafik/tabel WAJIB menyertakan kolom-kolom filter dalam klausa SELECT (dan GROUP BY jika query memiliki agregasi). Hal ini karena filter akan diaplikasikan di luar kueri tersebut (sebagai subquery).
-  Contoh: Jika Anda mendefinisikan filter "kategori", maka query Anda wajib menyertakan kolom "kategori" di SELECT dan GROUP BY:
-  `SELECT bulan, SUM(penjualan) as penjualan, kategori FROM dataset GROUP BY bulan, kategori`
+  PENTING — JANGAN GUNAKAN BACKTICK (`) DALAM KLAUSA QUERY SQL. DuckDB tidak mendukung backtick. Gunakan double quote (") jika perlu meng-quote nama kolom yang mengandung spasi atau karakter khusus. Untuk penyaringan/ekstraksi tanggal di DuckDB, selalu lakukan CAST(kolom_tanggal AS DATE) terlebih dahulu sebelum menggunakan fungsi YEAR(), MONTH(), atau strftime() (contoh: YEAR(CAST(tanggal AS DATE))).
+  PENTING — Buat filter ID yang cocok dengan nama kolom di dataset (contoh: jika nama kolom di CSV adalah "categori", gunakan filter ID "categori" atau "kategori" agar filter interaktif frontend dapat mencocokkannya secara otomatis).
 - Gunakan data_profile_tool saat user minta 'profiling', 'laporan data', atau 'ringkasan lengkap dataset'
 - Gunakan bash_tool untuk operasi file cepat (ls, mv, cp, rm, head) — JANGAN gunakan untuk analisis data
 - Gunakan update_task_list_tool di AWAL analisis untuk merencanakan tugas, dan panggil lagi setiap kali menyelesaikan satu tugas

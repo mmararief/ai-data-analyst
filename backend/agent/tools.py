@@ -290,7 +290,7 @@ if fmt == "ipynb":
         pass
 
     cells = []
-    code_block_re = re.compile(r"```(?:python)?\n(.*?)```", re.DOTALL)
+    code_block_re = re.compile(r"```(?:python)?\\n(.*?)```", re.DOTALL)
     parts = code_block_re.split(content)
     for i, part in enumerate(parts):
         text = part.strip()
@@ -302,13 +302,13 @@ if fmt == "ipynb":
                 "execution_count": None,
                 "metadata": {{}},
                 "outputs": [],
-                "source": [ln + "\n" for ln in text.split("\n")],
+                "source": [ln + "\\n" for ln in text.split("\\n")],
             }})
         else:
             cells.append({{
                 "cell_type": "markdown",
                 "metadata": {{}},
-                "source": [ln + "\n" for ln in text.split("\n")],
+                "source": [ln + "\\n" for ln in text.split("\\n")],
             }})
 
     notebook = {{
@@ -358,7 +358,7 @@ else:
 
 print(f"DONE:{{out_path}}")
 """
-        output = run_ai_code_securely(script_code, data_folder_path=folder_str)
+        output = run_ai_code_securely(script_code, data_folder_path=folder_str, bypass_validation=True)
 
         # Cleanup temp file
         if temp_input_path.exists():
@@ -369,7 +369,7 @@ print(f"DONE:{{out_path}}")
                 "type": "file_export",
                 "error": f"Format '{fmt}' tidak didukung. Gunakan: ipynb, csv, xlsx, json, md, html, txt, py",
             }, ensure_ascii=False)
-        elif "ERROR:" in output:
+        elif "error" in output.lower():
             return json.dumps({
                 "type": "file_export",
                 "error": f"Gagal mengekspor file: {output}",
@@ -655,7 +655,7 @@ print(f"DONE:{{out_path}}")
 
         try:
             output_parts = []
-            for line in stream_ai_code_securely(profile_code, data_folder_path=folder_str):
+            for line in stream_ai_code_securely(profile_code, data_folder_path=folder_str, bypass_validation=True):
                 output_parts.append(line)
                 if line.rstrip():
                     _push(line.rstrip())
@@ -815,9 +815,18 @@ print(f"DONE:{{out_path}}")
     # Build tool list
     tool_list = [update_task_list_tool, read_data_tool, python_repl_tool, render_chart_tool, file_export_tool, data_profile_tool, bash_tool, download_dataset_tool]
 
+    kwargs = {
+        "checkpointer": MemorySaver(),
+    }
+    import inspect
+    sig = inspect.signature(create_react_agent)
+    if "prompt" in sig.parameters:
+        kwargs["prompt"] = prompt
+    else:
+        kwargs["messages_modifier"] = prompt
+
     return create_react_agent(
         llm,
         tools=tool_list,
-        messages_modifier=prompt,
-        checkpointer=MemorySaver(),
+        **kwargs
     )

@@ -10,8 +10,10 @@ import 'ag-grid-community/styles/ag-theme-quartz.css'
 // Register AG Grid Modules
 ModuleRegistry.registerModules([AllCommunityModule])
 
-const buildFilteredQuery = (baseQuery, activeFilters, filtersConfig) => {
+const buildFilteredQuery = (baseQuery, activeFilters, config) => {
   if (!baseQuery) return ''
+  const filtersConfig = config?.filters
+  const datasetName = config?.dataset_name
   
   // Remove trailing semicolon to allow wrapping in subquery
   const cleanBaseQuery = baseQuery.trim().replace(/;+$/, '')
@@ -21,15 +23,26 @@ const buildFilteredQuery = (baseQuery, activeFilters, filtersConfig) => {
     const fConfig = filtersConfig?.find(f => f.id === filterId)
     if (!fConfig) return
     
+    let columnExpr = filterId
+    if (filterId === 'tahun') {
+      columnExpr = "YEAR(CAST(tanggal AS DATE))"
+    } else if (filterId === 'bulan') {
+      columnExpr = "MONTH(CAST(tanggal AS DATE))"
+    } else if (filterId === 'kategori') {
+      if (datasetName && datasetName.toLowerCase().includes('ispu')) {
+        columnExpr = "categori"
+      }
+    }
+    
     if (fConfig.type === 'search') {
       if (activeVal && activeVal.trim() !== '') {
         const safeVal = activeVal.replace(/'/g, "''")
-        conditions.push(`LOWER(${filterId}) LIKE '%${safeVal.toLowerCase()}%'`)
+        conditions.push(`LOWER(${columnExpr}) LIKE '%${safeVal.toLowerCase()}%'`)
       }
     } else {
       if (activeVal !== 'Semua' && activeVal !== '') {
         const safeVal = activeVal.replace(/'/g, "''")
-        conditions.push(`${filterId} = '${safeVal}'`)
+        conditions.push(`${columnExpr} = '${safeVal}'`)
       }
     }
   })
@@ -37,6 +50,12 @@ const buildFilteredQuery = (baseQuery, activeFilters, filtersConfig) => {
   if (conditions.length === 0) return cleanBaseQuery
   
   const whereClause = conditions.join(' AND ')
+  
+  const datasetRegex = /\bdataset\b/gi
+  if (datasetRegex.test(cleanBaseQuery)) {
+    return cleanBaseQuery.replace(datasetRegex, `(SELECT * FROM dataset WHERE ${whereClause})`)
+  }
+  
   return `SELECT * FROM (${cleanBaseQuery}) AS subquery WHERE ${whereClause}`
 }
 
@@ -131,7 +150,7 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
     const token = localStorage.getItem('token')
     
     // Wrap base query with current filter values
-    const queryToRun = buildFilteredQuery(baseQuery, activeFilters, config?.filters)
+    const queryToRun = buildFilteredQuery(baseQuery, activeFilters, config)
     
     try {
       const response = await fetch(`/datasets/${projectId}/query`, {
