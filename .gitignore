@@ -20,6 +20,9 @@ pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
+.agents/
+.kiro/
+skills-lock.json
 *.egg
 MANIFEST
 venv/
@@ -111,3 +114,8 @@ coverage.xml
 * copy.*
 
 .venv-py312/
+
+# Thesis / non-application scripts (keep repo focused on the app)
+Skripsi/
+fix_bab2.py
+get_doi.py

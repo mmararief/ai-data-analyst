@@ -194,13 +194,24 @@ def cleanup_all_sandboxes():
         logger.warning(f"Gagal membersihkan orphan sandboxes: {e}")
 
 
-def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypass_validation: bool = False):
+def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypass_validation: bool = False, status_out: list | None = None):
+    """Stream sandbox stdout/stderr.
+
+    If ``status_out`` (a list) is provided, the real execution status reported
+    by the sandbox kernel ("success" | "error") is appended to it. This lets
+    callers detect failures reliably instead of guessing from the output text.
+    """
+    def _set_status(value: str) -> None:
+        if status_out is not None:
+            status_out.append(value)
+
     absolute_data_path = os.path.abspath(data_folder_path)
     lock = _get_lock(absolute_data_path)
     
     if not bypass_validation:
         validation_error = _validate_code(ai_generated_code)
         if validation_error:
+            _set_status("error")
             yield f"\nError: {validation_error}\n"
             return
 
@@ -226,6 +237,7 @@ def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypas
             
             while True:
                 if time.time() - start_time > timeout:
+                    _set_status("error")
                     yield f"\nError: Timeout — kode memakan waktu lebih dari {timeout} detik.\n"
                     break
                     
@@ -234,6 +246,9 @@ def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypas
                         with open(res_file, "r", encoding="utf-8") as f:
                             res = json.load(f)
                         
+                        # Surface the kernel's real exec status (set on exception)
+                        _set_status(res.get("status", "success"))
+
                         if res.get("stdout"):
                             yield res["stdout"]
                         if res.get("stderr"):
@@ -247,10 +262,11 @@ def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypas
                 time.sleep(0.1)
                 
         except Exception as e:
+            _set_status("error")
             yield f"Sistem Sandbox gagal: {str(e)}\n"
 
-def run_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypass_validation: bool = False) -> str:
-    return "".join(stream_ai_code_securely(ai_generated_code, data_folder_path, bypass_validation=bypass_validation))
+def run_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypass_validation: bool = False, status_out: list | None = None) -> str:
+    return "".join(stream_ai_code_securely(ai_generated_code, data_folder_path, bypass_validation=bypass_validation, status_out=status_out))
 
 def run_bash_in_sandbox(command: str, data_folder_path: str) -> str:
     absolute_data_path = os.path.abspath(data_folder_path)

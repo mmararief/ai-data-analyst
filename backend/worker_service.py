@@ -182,7 +182,6 @@ def _auto_save_session(
     ai_code_steps: list[dict] = []
     ai_images: list[str] = []
     ai_content = ""
-    plan_part: dict | None = None
 
     for ev in events:
         t = ev.get("type")
@@ -205,17 +204,6 @@ def _auto_save_session(
         elif t == "output":
             if ai_code_steps:
                 ai_code_steps[-1]["output"] = c
-        elif t == "plan":
-            plan_part = {"type": "plan", "content": c}
-        elif t == "task_start":
-            ai_parts.append({
-                "type": "task_start",
-                "content": c,
-                "index": ev.get("index"),
-                "total": ev.get("total"),
-            })
-        elif t == "agent_label":
-            ai_parts.append({"type": "agent_label", "content": c})
         elif t == "clarification":
             # Support both the new Intent Agent shape (questions: [...]) and
             # the legacy single-question shape (question + options) so that
@@ -232,13 +220,6 @@ def _auto_save_session(
             if ev.get("reasoning"):
                 clar_part["reasoning"] = ev.get("reasoning")
             ai_parts.append(clar_part)
-        elif t == "critic":
-            ai_parts.append({
-                "type": "critic",
-                "judgment": ev.get("judgment", "ok"),
-                "feedback": ev.get("feedback", ""),
-                "additional_tasks": ev.get("additional_tasks", []),
-            })
         elif t == "file_export_done":
             ai_parts.append({
                 "type": "file_export",
@@ -248,9 +229,6 @@ def _auto_save_session(
                 "error": ev.get("error"),
             })
 
-
-    if plan_part:
-        ai_parts.insert(0, plan_part)
 
     messages.append({
         "role": "assistant",

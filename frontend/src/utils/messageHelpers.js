@@ -149,20 +149,6 @@ export function applyEventToLastMessage(messages, event) {
       next.codeSteps = steps
       break
     }
-    case 'plan':
-      next.parts = [{ type: 'plan', content: event.content }, ...(prev.parts || [])]
-      break
-    case 'task_start':
-      next.parts = [
-        ...(prev.parts || []),
-        { type: 'task_start', content: event.content, index: event.index, total: event.total, agent: event.agent },
-      ]
-      next._breakText = true
-      break
-    case 'agent_label':
-      next.parts = [...(prev.parts || []), { type: 'agent_label', content: event.content }]
-      next._breakText = true
-      break
     case 'clarification':
       next.parts = [
         ...(prev.parts || []),
@@ -176,21 +162,6 @@ export function applyEventToLastMessage(messages, event) {
           reasoning: event.reasoning,
         },
       ]
-      break
-    case 'critic':
-      next.parts = [
-        ...(prev.parts || []),
-        {
-          type: 'critic',
-          judgment: event.judgment,
-          feedback: event.feedback,
-          additional_tasks: event.additional_tasks,
-        },
-      ]
-      break
-    case 'insight':
-      next.parts = [...(prev.parts || []), { type: 'insight', content: event.content }]
-      next.content = (prev.content || '') + event.content
       break
     case 'file_export_done':
       next.parts = [
@@ -223,10 +194,6 @@ export function statusForEvent(event) {
     case 'output': return 'Membaca hasil eksekusi...'
     case 'image': return 'Membuat grafik...'
     case 'error': return 'Terjadi kesalahan...'
-    case 'agent_label': return event.content === 'Execution' ? 'Menjalankan analisis...' : `${event.content}...`
-    case 'critic': return 'Mengevaluasi hasil...'
-    case 'plan': return `Merencanakan ${event.content?.length || 0} langkah...`
-    case 'task_start': return `[${(event.index ?? 0) + 1}/${event.total}] ${event.content}`
     case 'file_export_start': return `Mengekspor ${event.filename}...`
     case 'file_export_done': return `File diekspor: ${event.filename}`
     case 'chart_start': return `Membuat chart: ${event.filename}`

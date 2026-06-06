@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+﻿import { useEffect, useRef } from 'react'
 import { Chart } from 'chart.js/auto'
 
 const DEFAULT_COLORS = [
@@ -164,7 +164,7 @@ export default function NativeChartRenderer({
             labels: {
               color: textColor,
               font: {
-                family: "'Outfit', sans-serif",
+                family: "'Inter', sans-serif",
                 size: 11,
               },
               padding: 15,
@@ -179,7 +179,7 @@ export default function NativeChartRenderer({
             padding: 10,
             cornerRadius: 8,
             titleFont: {
-              family: "'Outfit', sans-serif",
+              family: "'Inter', sans-serif",
               weight: 'bold',
             },
             bodyFont: {
@@ -197,7 +197,7 @@ export default function NativeChartRenderer({
             ticks: {
               color: textColor,
               font: {
-                family: "'Outfit', sans-serif",
+                family: "'Inter', sans-serif",
                 size: 11,
               },
             },

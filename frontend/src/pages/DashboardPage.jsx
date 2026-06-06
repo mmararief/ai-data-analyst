@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+﻿import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api'
@@ -166,7 +166,7 @@ function ProjectCard({ project, index, onNavigate, onEdit, onDelete }) {
             width:'100%', background:'var(--bg-hover)',
             border:`1px solid ${accent}50`, borderRadius:6,
             padding:'0.3rem 0.5rem', color:'var(--text-primary)',
-            fontFamily:"'Syne',sans-serif", fontSize:'0.92rem', fontWeight:700,
+            fontFamily:"'Inter',sans-serif", fontSize:'0.92rem', fontWeight:700,
             outline:'none', marginBottom:'0.35rem',
           }}
         />
@@ -272,7 +272,7 @@ export default function DashboardPage({ username, onLogout }) {
       <div style={{
         minHeight:'100vh',
         background:'var(--bg-page)',
-        fontFamily:"'Syne',sans-serif",
+        fontFamily:"'Inter',sans-serif",
         color:'var(--text-primary)',
         position:'relative',
       }}>
@@ -296,7 +296,7 @@ export default function DashboardPage({ username, onLogout }) {
             <div style={{ display:'flex', alignItems:'center', gap:'0.6rem' }}>
               <span style={{ 
                 fontSize:'1.25rem', fontWeight:500, color:'var(--text-secondary)', letterSpacing:'-0.02em',
-                fontFamily:"'Syne',sans-serif"
+                fontFamily:"'Inter',sans-serif"
               }}>
                 Analisai
               </span>
@@ -383,10 +383,10 @@ export default function DashboardPage({ username, onLogout }) {
               <div style={{
                 fontFamily:"'JetBrains Mono',monospace",
                 fontSize:'0.62rem', letterSpacing:'0.14em',
-                color:'#38bdf8', marginBottom:'0.6rem',
+                color:'var(--analisai-cyan)', marginBottom:'0.6rem',
                 display:'flex', alignItems:'center', gap:'0.4rem',
               }}>
-                <span style={{ width:16, height:1, background:'#38bdf8', display:'block' }} />
+                <span style={{ width:16, height:1, background:'var(--analisai-cyan)', display:'block' }} />
                 WORKSPACE
               </div>
               <h1 style={{
@@ -414,7 +414,7 @@ export default function DashboardPage({ username, onLogout }) {
                 height:44, padding:'0 1.4rem',
                 background:'var(--btn-send-bg)',
                 border:'none', borderRadius:9999,
-                fontFamily:"'Syne',sans-serif", fontSize:'0.88rem', fontWeight:600,
+                fontFamily:"'Inter',sans-serif", fontSize:'0.88rem', fontWeight:600,
                 color:'var(--btn-send-icon)', cursor:'pointer',
                 transition:'transform 0.15s, box-shadow 0.2s',
               }}
@@ -455,12 +455,12 @@ export default function DashboardPage({ username, onLogout }) {
                   style={{
                     width:'100%',
                     background:'var(--bg-input)',
-                    border:`1px solid ${searchFocused ? 'rgba(255,255,255,0.1)' : 'transparent'}`,
+                    border:`1px solid ${searchFocused ? 'var(--analisai-cyan)' : 'var(--border-primary)'}`,
                     borderRadius:9999, padding:'0.75rem 1rem 0.75rem 2.4rem',
-                    color:'var(--text-primary)', fontFamily:"'Syne',sans-serif", fontSize:'0.9rem',
+                    color:'var(--text-primary)', fontFamily:"'Inter',sans-serif", fontSize:'0.9rem',
                     outline:'none',
                     transition:'border-color 0.2s, box-shadow 0.2s',
-                    boxShadow: searchFocused ? '0 0 0 4px rgba(255,255,255,0.03)' : 'none',
+                    boxShadow: searchFocused ? '0 0 0 4px rgba(11,87,208,0.08)' : 'none',
                   }}
                 />
                 {search && (
@@ -469,7 +469,7 @@ export default function DashboardPage({ username, onLogout }) {
                     style={{
                       position:'absolute', right:'0.75rem', top:'50%',
                       transform:'translateY(-50%)', background:'none', border:'none',
-                      color:'#334155', cursor:'pointer', padding:0, display:'flex',
+                      color:'var(--text-muted)', cursor:'pointer', padding:0, display:'flex',
                     }}
                   >
                     <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -484,7 +484,7 @@ export default function DashboardPage({ username, onLogout }) {
           {/* Loading */}
           {loading && (
             <div style={{ display:'flex', justifyContent:'center', paddingTop:'6rem' }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#38bdf8"
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--analisai-cyan)"
                 style={{ animation:'spin 0.9s linear infinite' }}>
                 <circle cx="12" cy="12" r="10" strokeWidth="3" strokeOpacity="0.2"/>
                 <path d="M12 2a10 10 0 0110 10" strokeWidth="3" strokeLinecap="round"/>
@@ -540,7 +540,7 @@ export default function DashboardPage({ username, onLogout }) {
                   height:44, padding:'0 1.5rem',
                   background:'var(--btn-send-bg)',
                   border:'none', borderRadius:10,
-                  fontFamily:"'Syne',sans-serif", fontSize:'0.88rem', fontWeight:700,
+                  fontFamily:"'Inter',sans-serif", fontSize:'0.88rem', fontWeight:700,
                   color:'var(--btn-send-icon)', cursor:'pointer',
                   transition:'transform 0.15s, box-shadow 0.2s',
                 }}
@@ -560,10 +560,10 @@ export default function DashboardPage({ username, onLogout }) {
               style={{
                 textAlign:'center', paddingTop:'4rem',
                 fontFamily:"'JetBrains Mono',monospace",
-                fontSize:'0.72rem', color:'#334155', letterSpacing:'0.06em',
+                fontSize:'0.72rem', color:'var(--text-muted)', letterSpacing:'0.06em',
               }}
             >
-              Tidak ada project yang cocok dengan "<span style={{ color:'#475569' }}>{search}</span>"
+              Tidak ada project yang cocok dengan "<span style={{ color:'var(--text-secondary)' }}>{search}</span>"
             </motion.div>
           )}
 
@@ -603,16 +603,16 @@ export default function DashboardPage({ username, onLogout }) {
                   gap:'0.75rem',
                 }}
                 whileHover={{
-                  borderColor:'rgba(56,189,248,0.3)',
-                  background:'rgba(56,189,248,0.03)',
+                  borderColor:'var(--analisai-cyan)',
+                  background:'var(--bg-hover)',
                 }}
               >
                 <div style={{
                   width:36, height:36, borderRadius:9,
-                  background:'rgba(255,255,255,0.02)',
-                  border:'1px solid rgba(255,255,255,0.07)',
+                  background:'var(--bg-hover)',
+                  border:'1px solid var(--border-primary)',
                   display:'flex', alignItems:'center', justifyContent:'center',
-                  color:'#334155',
+                  color:'var(--text-muted)',
                 }}>
                   <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
@@ -620,7 +620,7 @@ export default function DashboardPage({ username, onLogout }) {
                 </div>
                 <span style={{
                   fontFamily:"'JetBrains Mono',monospace",
-                  fontSize:'0.65rem', color:'#334155',
+                  fontSize:'0.65rem', color:'var(--text-muted)',
                   letterSpacing:'0.1em', textTransform:'uppercase',
                 }}>
                   Buat project baru

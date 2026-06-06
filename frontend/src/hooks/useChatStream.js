@@ -363,19 +363,6 @@ function applyEventToAccumulator(acc, event) {
     case 'task_widget_update':
       acc.taskWidget = { tasks: event.tasks || [], completed: event.completed || [] }
       break
-    case 'plan':
-      acc.parts.unshift({ type: 'plan', content: event.content })
-      break
-    case 'task_start':
-      acc.parts.push({
-        type: 'task_start', content: event.content,
-        index: event.index, total: event.total, agent: event.agent,
-      })
-      acc._breakText = true
-      break
-    case 'agent_label':
-      acc.parts.push({ type: 'agent_label', content: event.content })
-      break
     case 'clarification':
       acc.parts.push({
         type: 'clarification',
@@ -385,18 +372,6 @@ function applyEventToAccumulator(acc, event) {
         intent: event.intent,
         reasoning: event.reasoning,
       })
-      break
-    case 'critic':
-      acc.parts.push({
-        type: 'critic',
-        judgment: event.judgment,
-        feedback: event.feedback,
-        additional_tasks: event.additional_tasks,
-      })
-      break
-    case 'insight':
-      acc.content += event.content
-      acc.parts.push({ type: 'insight', content: event.content })
       break
     case 'file_export_done':
       acc.parts.push({

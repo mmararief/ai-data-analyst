@@ -1,4 +1,4 @@
-// Scrollable list of chat messages with the empty welcome state and the
+﻿// Scrollable list of chat messages with the empty welcome state and the
 // floating "scroll to bottom" pill.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -135,7 +135,7 @@ function EmptyState({ username }) {
         fontSize: 'clamp(2.5rem, 5vw, 3.5rem)', fontWeight: 600,
         background: 'linear-gradient(90deg, #a8c7fa, #c58cf2)',
         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-        fontFamily: "'Syne', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         letterSpacing: '-0.04em',
         marginBottom: '0.1rem',
       }}>
@@ -143,7 +143,7 @@ function EmptyState({ username }) {
       </div>
       <div style={{
         fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 500, color: 'var(--text-secondary)',
-        fontFamily: "'Syne', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         letterSpacing: '-0.04em',
       }}>
         Where should we start?

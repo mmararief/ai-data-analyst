@@ -1,10 +1,37 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 @theme {
+  --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* ═══════════════════════════════════════════════
+   Typography — Inter for display headings
+   ═══════════════════════════════════════════════ */
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* Tabular figures for data-heavy numbers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keep anchored sections clear of the fixed navbar */
+html { scroll-behavior: smooth; }
+section[id] { scroll-margin-top: 96px; }
+
+/* Visible focus ring for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--analisai-cyan);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 
 /* ═══════════════════════════════════════════════
    Theme CSS Variables
@@ -296,4 +323,27 @@ body {
 }
 @media (min-width: 769px) {
   .computer-panel-mobile-tab { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════════
+   Shared keyframes + Dashboard controls
+   (referenced by DashboardPage but previously undefined)
+   ═══════════════════════════════════════════════ */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.dash-create-btn, .empty-create { will-change: transform; }
+.dash-create-btn:hover, .empty-create:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.dash-create-btn:active, .empty-create:active {
+  transform: translateY(0) scale(0.98);
+}
+.dash-theme-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--analisai-cyan);
 }

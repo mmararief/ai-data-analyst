@@ -1,4 +1,4 @@
-// Chat input area: textarea, web-search toggle, stop/send buttons,
+﻿// Chat input area: textarea, web-search toggle, stop/send buttons,
 // suggestion chips (only shown when the chat is empty), and disclaimer text.
 
 import { useRef, useState } from 'react'
@@ -87,10 +87,10 @@ export default function ChatComposer({
         <div style={{
           display: 'flex', alignItems: 'flex-end',
           background: 'var(--bg-input)',
-          border: `1px solid ${inputFocused ? 'rgba(255,255,255,0.1)' : 'transparent'}`,
+          border: `1px solid ${inputFocused ? 'var(--analisai-cyan)' : 'var(--border-primary)'}`,
           borderRadius: 28,
           transition: 'border-color 0.2s, box-shadow 0.2s',
-          boxShadow: inputFocused ? '0 0 0 4px rgba(255,255,255,0.03)' : 'none',
+          boxShadow: inputFocused ? '0 0 0 4px rgba(11,87,208,0.08)' : 'none',
           overflow: 'hidden',
           paddingBottom: 8,
         }}>
@@ -112,7 +112,7 @@ export default function ChatComposer({
               flex: 1, background: 'transparent',
               border: 'none', outline: 'none', resize: 'none',
               padding: '1.1rem 1.5rem 0.5rem',
-              color: 'var(--text-primary)', fontFamily: "'Syne', sans-serif",
+              color: 'var(--text-primary)', fontFamily: "'Inter', sans-serif",
               fontSize: '1rem', lineHeight: 1.6,
               minHeight: 56, maxHeight: 160,
               height: 56,
@@ -211,7 +211,7 @@ export default function ChatComposer({
 
         <div style={{
           textAlign: 'center', marginTop: '0.75rem',
-          fontFamily: "'Syne', sans-serif",
+          fontFamily: "'Inter', sans-serif",
           fontSize: '0.65rem', color: 'var(--text-muted)',
         }}>
           Analisai can make mistakes. Check important info.

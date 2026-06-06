@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+﻿import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import DataPreviewModal from './DataPreviewModal'
@@ -291,7 +291,7 @@ export default function Sidebar({ projectId, sessionId, onSuggest, onLoadHistory
       height: '100%',
       background: sidebarBg,
       display: 'flex', flexDirection: 'column',
-      fontFamily: "'Outfit', sans-serif",
+      fontFamily: "'Inter', sans-serif",
       overflow: 'hidden',
       flexShrink: 0,
       borderRight: `1px solid ${borderCol}`,
@@ -349,7 +349,7 @@ export default function Sidebar({ projectId, sessionId, onSuggest, onLoadHistory
             width: '100%', padding: '0.7rem 1rem',
             background: cardBg, border: `1px solid ${borderCol}`,
             borderRadius: 12, cursor: 'pointer',
-            fontFamily: "'Outfit', sans-serif", fontSize: '0.82rem', fontWeight: 600,
+            fontFamily: "'Inter', sans-serif", fontSize: '0.82rem', fontWeight: 600,
             color: textPrimary, transition: 'all 0.2s ease',
             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
           }}

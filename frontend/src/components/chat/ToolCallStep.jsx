@@ -99,13 +99,13 @@ export default function ToolCallStep({ step, index, isRunning, isSelected, onSel
   return (
     <button
       onClick={() => onSelect(index)}
-      className={`group flex items-center gap-3.5 w-full text-left py-2.5 px-3.5 rounded-xl transition-all border shadow-sm cursor-pointer ${
-        isSelected 
-          ? 'bg-[var(--bg-hover)] border-[var(--text-accent)] text-[var(--text-primary)] font-semibold shadow-md' 
-          : 'bg-[var(--bg-secondary)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] hover:border-[var(--border-primary)]'
+      className={`group flex items-center gap-3 w-full text-left py-1.5 px-2 rounded-lg transition-colors cursor-pointer border border-transparent ${
+        isSelected
+          ? 'bg-[var(--bg-hover)] text-[var(--text-primary)] font-medium'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
       }`}
     >
-      <div className={`w-4.5 h-4.5 shrink-0 flex items-center justify-center ${color}`}>
+      <div className={`w-4 h-4 shrink-0 flex items-center justify-center ${color}`}>
         {isRunning ? <SpinIcon /> : icon}
       </div>
 
@@ -115,7 +115,7 @@ export default function ToolCallStep({ step, index, isRunning, isSelected, onSel
         </span>
       </div>
 
-      <span className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors shrink-0">
+      <span className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
         </svg>

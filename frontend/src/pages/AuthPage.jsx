@@ -302,7 +302,7 @@ export default function AuthPage({ onLogin }) {
               }}>
                 Analisis data<br />
                 <span style={{
-                  background: 'linear-gradient(135deg, var(--analisai-cyan), #818cf8)',
+                  background: 'linear-gradient(135deg, var(--analisai-cyan), var(--analisai-cyan2))',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
                   backgroundClip: 'text',
@@ -369,7 +369,7 @@ export default function AuthPage({ onLogin }) {
               fontSize: '0.62rem', color: 'var(--text-muted)',
               letterSpacing: '0.08em',
             }}>
-              © 2026 ANALISAI
+              © {new Date().getFullYear()} ANALISAI
             </div>
           </div>
         </div>
