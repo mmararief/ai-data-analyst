@@ -27,12 +27,15 @@ _BLOCKED_PATTERNS = [
     r"\bos\.(?:system|popen|exec|spawn|remove|rmdir|rename|replace|chmod|chown|kill|getenv|environ)\b",
     r"\bsubprocess\b",
     r"\b__import__\b",
-    r"\bimport\s+(?:subprocess|shutil|socket|http|urllib|requests|ctypes)\b",
-    r"\bfrom\s+(?:subprocess|shutil|socket|http|urllib|requests|ctypes)\s+import\b",
+    r"\bimport\s+(?:subprocess|shutil|socket|http|urllib|requests|ctypes|pickle|shelve|marshal)\b",
+    r"\bfrom\s+(?:subprocess|shutil|socket|http|urllib|requests|ctypes|pickle|shelve|marshal)\s+import\b",
     r"\bopen\s*\([^)]*['\"]w",
     r"\b__builtins__\b",
     r"\bexecfile\b",
     r"\breload\b",
+    r"\bpickle\.loads?\b",
+    r"\bshelve\.open\b",
+    r"\bmarshal\.loads?\b",
 ]
 
 def _validate_code(code: str) -> str | None:

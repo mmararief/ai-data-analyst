@@ -17,18 +17,21 @@ _load_env()
 
 APP_ENV: str = os.environ.get("APP_ENV", "development").lower()
 
-SECRET_KEY: str = os.environ.get("SECRET_KEY", "changeme-super-secret-key")
+_DEFAULT_SECRET = "changeme-super-secret-key"  # only used in local dev
+SECRET_KEY: str = os.environ.get("SECRET_KEY", _DEFAULT_SECRET)
 ALGORITHM: str = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 hari
+ACCESS_TOKEN_EXPIRE_MINUTES: int = int(
+    os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+)  # default 1 jam (override via env)
 
 # Database
-MYSQL_URL: str = os.environ.get("MYSQL_URL", "mysql+pymysql://root:password@localhost:3306/ai_analyst")
+MYSQL_URL: str = os.environ.get("MYSQL_URL", "mysql+pymysql://root:password@localhost:3306/ai_analyst")  # override via env
 REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 # MinIO object storage
 MINIO_ENDPOINT: str = os.environ.get("MINIO_ENDPOINT", "localhost:9000")
-MINIO_ACCESS_KEY: str = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")
-MINIO_SECRET_KEY: str = os.environ.get("MINIO_SECRET_KEY", "minioadmin123")
+MINIO_ACCESS_KEY: str = os.environ.get("MINIO_ACCESS_KEY", "minioadmin")  # override via env
+MINIO_SECRET_KEY: str = os.environ.get("MINIO_SECRET_KEY", "minioadmin123")  # override via env
 MINIO_BUCKET: str = os.environ.get("MINIO_BUCKET", "ai-datasets")
 MINIO_SECURE: bool = os.environ.get("MINIO_SECURE", "false").lower() == "true"
 
