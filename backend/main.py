@@ -8,13 +8,14 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text as sa_text
 
 from backend.core.database import init_db, engine
-from backend.core.config import APP_ENV, SECRET_KEY, ALLOWED_ORIGINS, REDIS_URL, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET
+from backend.core.config import APP_ENV, SECRET_KEY, ALLOWED_ORIGINS, REDIS_URL, MINIO_BUCKET
 from backend.routers import auth, datasets, chat, notebook, history, projects
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if APP_ENV != "development" and SECRET_KEY == "changeme-super-secret-key":
+    from backend.core.config import _DEFAULT_SECRET
+    if APP_ENV != "development" and SECRET_KEY == _DEFAULT_SECRET:
         raise RuntimeError("SECRET_KEY default tidak boleh digunakan di environment non-development")
     init_db()
     yield
@@ -28,8 +29,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
 
 app.include_router(auth.router)
@@ -48,19 +49,18 @@ def health():
         with engine.connect() as conn:
             conn.execute(sa_text("SELECT 1"))
         statuses["mysql"] = "ok"
-    except Exception as e:
-        statuses["mysql"] = f"error: {e}"
+    except Exception:
+        statuses["mysql"] = "error"
     try:
         rc = redis.from_url(REDIS_URL, decode_responses=True)
         rc.ping()
         statuses["redis"] = "ok"
-    except Exception as e:
-        statuses["redis"] = f"error: {e}"
+    except Exception:
+        statuses["redis"] = "error"
     try:
-        from minio import Minio
-        mc = Minio(MINIO_ENDPOINT, access_key=MINIO_ACCESS_KEY, secret_key=MINIO_SECRET_KEY, secure=False)
-        mc.bucket_exists(MINIO_BUCKET)
+        from backend.core.minio_store import _get_client
+        _get_client().bucket_exists(MINIO_BUCKET)
         statuses["minio"] = "ok"
-    except Exception as e:
-        statuses["minio"] = f"error: {e}"
+    except Exception:
+        statuses["minio"] = "error"
     return statuses

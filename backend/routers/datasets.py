@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
-ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".json", ".parquet", ".pkl"}
+ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".json", ".parquet"}
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 SCHEMA_FILENAME = "_schema.json"
 
@@ -134,7 +134,11 @@ def _infer_schema(filename: str, data: bytes) -> dict | None:
         elif ext == ".parquet":
             df = pd.read_parquet(buf)
         elif ext == ".pkl":
-            df = pd.read_pickle(buf)
+            raise HTTPException(
+                400,
+                "Format .pkl (pickle) tidak didukung karena risiko keamanan. "
+                "Konversi ke CSV/Parquet terlebih dahulu.",
+            )
         else:
             return None
         if not isinstance(df, pd.DataFrame):
@@ -262,6 +266,7 @@ def download_file(project_id: str, filename: str, user: UserInDB = Depends(get_c
 
 @router.get("/{project_id}/preview/{filename:path}")
 def preview_file(project_id: str, filename: str, rows: int = 30, user: UserInDB = Depends(get_current_user)):
+    rows = max(1, min(rows, 500))
     rel_path = _normalize_relative_path(filename)
     if not rel_path or not object_exists(user.user_id, rel_path, project_id=project_id):
         raise HTTPException(404, "File tidak ditemukan")
@@ -318,6 +323,14 @@ def query_dataset(
     query = re.sub(r'`([^`]+)`', r'"\1"', query)
     # Cap result size: wrap the (SELECT) query in an outer LIMIT as a safety net
     clean_q = query.strip().rstrip(";").strip()
+    # Block DDL/admin SQL statements that should never come from the UI
+    _first_token = clean_q.split()[0].upper() if clean_q.split() else ""
+    _BLOCKED_SQL = {"DROP", "ALTER", "CREATE", "INSERT", "UPDATE", "DELETE",
+                    "TRUNCATE", "GRANT", "REVOKE", "COPY", "EXPORT", "IMPORT",
+                    "ATTACH", "DETACH", "LOAD", "INSTALL", "PRAGMA", "SET",
+                    "CALL", "EXECUTE", "EXEC"}
+    if _first_token in _BLOCKED_SQL:
+        raise HTTPException(400, f"Operasi SQL '{_first_token}' tidak diizinkan. Hanya SELECT query yang didukung.")
     capped_query = f"SELECT * FROM ({clean_q}) AS _capped LIMIT {MAX_QUERY_ROWS}"
 
     import duckdb
