@@ -1,5 +1,9 @@
+import logging
+
 from sqlalchemy import create_engine, Column, String, Text, DateTime, ForeignKey, func
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+logger = logging.getLogger(__name__)
 
 try:
     from backend.core.config import MYSQL_URL
@@ -32,7 +36,11 @@ class ProjectRow(Base):
 
 
 def init_db():
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        logger.error("Failed to initialize database tables", exc_info=True)
+        raise
 
 
 def get_db():

@@ -1,4 +1,5 @@
 import json
+import logging
 import shutil
 import tempfile
 import time
@@ -19,6 +20,8 @@ from backend.core.job_store import (
     create_job, get_status, get_events_from, enqueue_job,
     set_active_job, get_active_job, clear_active_job,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -54,6 +57,10 @@ def chat_stream(req: ChatRequest, user: UserInDB = Depends(get_current_user)):
             for event in run_agent_stream(tmp, req.question, history=history):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
             upload_generated_files(user_id, tmp, project_id=req.project_id)
+        except Exception as exc:
+            logger.error("chat_stream event_generator failed: %s", exc, exc_info=True)
+            error_event = {"type": "error", "content": f"Terjadi kesalahan server: {type(exc).__name__}"}
+            yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 

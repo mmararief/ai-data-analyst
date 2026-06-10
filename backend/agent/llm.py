@@ -7,13 +7,15 @@ import time
 
 try:
     from langchain_openai import ChatOpenAI
-except Exception:
+except ImportError:
     ChatOpenAI = None
+    logging.getLogger(__name__).info("langchain-openai not installed; OpenAI/SumoPod provider unavailable")
 
 try:
     from langchain_ollama import ChatOllama
-except Exception:
+except ImportError:
     ChatOllama = None
+    logging.getLogger(__name__).info("langchain-ollama not installed; Ollama provider unavailable")
 
 from backend.core.config import (
     AI_PROVIDER,

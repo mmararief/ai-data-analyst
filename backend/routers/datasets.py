@@ -103,7 +103,10 @@ def _load_schema_index(user_id: str, project_id: str) -> dict:
         if isinstance(parsed, dict) and isinstance(parsed.get("datasets"), list):
             return parsed
     except Exception:
-        pass
+        logger.warning(
+            "Failed to load schema index for user %s, project %s",
+            user_id, project_id, exc_info=True,
+        )
     return {"datasets": [], "updated_at": None}
 
 
@@ -138,6 +141,7 @@ def _infer_schema(filename: str, data: bytes) -> dict | None:
         else:
             return None
         if not isinstance(df, pd.DataFrame):
+            logger.warning("_infer_schema: %s did not produce a DataFrame", filename)
             return None
         return {
             "file": filename,
@@ -146,6 +150,7 @@ def _infer_schema(filename: str, data: bytes) -> dict | None:
             "types": {col: str(dtype) for col, dtype in df.dtypes.items()},
         }
     except Exception:
+        logger.warning("Failed to infer schema for %s", filename, exc_info=True)
         return None
 
 

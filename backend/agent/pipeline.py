@@ -10,6 +10,7 @@ Events emitted:
 """
 
 import json
+import logging
 import time
 import base64
 import threading
@@ -31,6 +32,8 @@ from backend.agent.utils import (
     CHART_PATH_RE,
     INTERNAL_PATH_RE,
 )
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -106,7 +109,7 @@ def run_agent_stream(
                     clar_question = data.get("question", "Saya mendeteksi beberapa file dataset di workspace Anda. File mana yang ingin Anda analisis?")
                     options = data.get("options", ["Analisis Semua (Gabungkan)", *files])
                 except Exception:
-                    # Fallback to static if LLM call fails
+                    logger.warning("LLM clarification generation failed, using static fallback", exc_info=True)
                     clar_question = "Saya mendeteksi beberapa file dataset di workspace Anda. File mana yang ingin Anda analisis?"
                     options = ["Analisis Semua (Gabungkan)", *files]
 

@@ -8,9 +8,12 @@ Schema (project-scoped):
       member=session_id, score=updated_at_timestamp (float, detik)
 """
 import json
+import logging
 from datetime import datetime, timezone
 
 import redis
+
+logger = logging.getLogger(__name__)
 
 try:
     from backend.core.config import REDIS_URL
@@ -35,7 +38,8 @@ def _now_iso() -> str:
 def _iso_to_score(iso: str) -> float:
     try:
         return datetime.fromisoformat(iso).timestamp()
-    except Exception:
+    except (ValueError, TypeError):
+        logger.warning("Failed to parse ISO timestamp: %.100s", iso)
         return 0.0
 
 
