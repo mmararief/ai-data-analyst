@@ -18,6 +18,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 limiter = Limiter(key_func=get_remote_address)
 
 
+def _create_token_pair(row: UserRow) -> tuple[str, str]:
+    """Return (access_token, refresh_token) for the given user row."""
+    data = {"sub": row.username, "user_id": row.user_id}
+    return create_access_token(data), create_refresh_token(data)
+
+
 class RegisterRequest(BaseModel):
     username: str
     password: str
@@ -66,8 +72,7 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Username atau password salah",
         )
-    access_token = create_access_token({"sub": row.username, "user_id": row.user_id})
-    refresh_token = create_refresh_token({"sub": row.username, "user_id": row.user_id})
+    access_token, refresh_token = _create_token_pair(row)
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 
 
@@ -86,6 +91,5 @@ def refresh_token(req: RefreshRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User tidak ditemukan",
         )
-    new_access = create_access_token({"sub": row.username, "user_id": row.user_id})
-    new_refresh = create_refresh_token({"sub": row.username, "user_id": row.user_id})
+    new_access, new_refresh = _create_token_pair(row)
     return TokenResponse(access_token=new_access, refresh_token=new_refresh)

@@ -18,6 +18,7 @@ from backend.core.minio_store import (
     remove_object, remove_prefix, object_exists, prefix_has_objects,
 )
 from backend.core.config import MAX_UPLOAD_MB, MAX_UPLOAD_FILES
+from backend.core.dataframe_utils import read_df_from_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -51,17 +52,10 @@ def _load_dataset_df(user_id: str, project_id: str, rel_path: str, ext: str) -> 
             return cached[0]
 
     data_bytes = get_object_bytes(user_id, rel_path, project_id=project_id)
-    buf = io.BytesIO(data_bytes)
-    if ext == ".csv":
-        df = pd.read_csv(buf)
-    elif ext in (".xlsx", ".xls"):
-        df = pd.read_excel(buf)
-    elif ext == ".json":
-        df = pd.read_json(buf)
-    elif ext == ".parquet":
-        df = pd.read_parquet(buf)
-    else:
-        raise HTTPException(400, f"Format tidak didukung: {ext}")
+    try:
+        df = read_df_from_bytes(data_bytes, ext)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
     with _DF_CACHE_LOCK:
         # Opportunistic prune of expired/oversized cache
@@ -124,19 +118,7 @@ def _save_schema_index(user_id: str, project_id: str, payload: dict) -> None:
 def _infer_schema(filename: str, data: bytes) -> dict | None:
     ext = Path(filename).suffix.lower()
     try:
-        buf = io.BytesIO(data)
-        if ext == ".csv":
-            df = pd.read_csv(buf)
-        elif ext in (".xlsx", ".xls"):
-            df = pd.read_excel(buf)
-        elif ext == ".json":
-            df = pd.read_json(buf)
-        elif ext == ".parquet":
-            df = pd.read_parquet(buf)
-        elif ext == ".pkl":
-            df = pd.read_pickle(buf)
-        else:
-            return None
+        df = read_df_from_bytes(data, ext)
         if not isinstance(df, pd.DataFrame):
             return None
         return {
@@ -268,16 +250,9 @@ def preview_file(project_id: str, filename: str, rows: int = 30, user: UserInDB 
     ext = Path(rel_path).suffix.lower()
     try:
         data = get_object_bytes(user.user_id, rel_path, project_id=project_id)
-        buf = io.BytesIO(data)
-        if ext == ".csv":
-            df = pd.read_csv(buf, nrows=rows)
-        elif ext in (".xlsx", ".xls"):
-            df = pd.read_excel(buf, nrows=rows)
-        elif ext == ".json":
-            df = pd.read_json(buf).head(rows)
-        elif ext == ".parquet":
-            df = pd.read_parquet(buf).head(rows)
-        else:
+        try:
+            df = read_df_from_bytes(data, ext, nrows=rows)
+        except ValueError:
             raise HTTPException(400, "Format tidak didukung untuk preview")
         return {
             "columns": df.columns.tolist(),
