@@ -23,6 +23,7 @@ x-shared-env: &shared-env
   MAX_HISTORY_MESSAGES: ${MAX_HISTORY_MESSAGES:-10}
   MAX_HISTORY_CONTENT_LEN: ${MAX_HISTORY_CONTENT_LEN:-2000}
   DOCKER_HOST: tcp://docker-proxy:2375
+  HOST_PROJECT_DIR: ${HOST_PROJECT_DIR:-${PWD}}
 
 x-worker-env: &worker-env
   SANDBOX_TIMEOUT: ${SANDBOX_TIMEOUT:-120}
@@ -55,6 +56,8 @@ services:
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     environment:
       <<: [*shared-env]
+    volumes:
+      - ./temp:/app/temp
     ports:
       - "8000:8000"
     depends_on:
@@ -79,6 +82,7 @@ services:
       <<: [*shared-env, *worker-env]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./temp:/app/temp
     depends_on:
       docker-proxy:
         condition: service_started

@@ -144,6 +144,22 @@ def _ensure_sandbox_started(data_folder_path: str):
     except Exception:
         pass
         
+    # Resolve host bind path for Docker-in-Docker / Docker-sibling volume mounting
+    host_temp_dir = os.environ.get("HOST_TEMP_DIR") or os.environ.get("HOST_PROJECT_DIR")
+    if host_temp_dir:
+        norm_data = os.path.normpath(absolute_data_path)
+        norm_temp = os.path.normpath(str(TEMP_ROOT))
+        if norm_data.startswith(norm_temp):
+            rel = os.path.relpath(norm_data, norm_temp)
+            if host_temp_dir.rstrip("/\\").endswith("temp"):
+                bind_path = os.path.join(host_temp_dir, rel)
+            else:
+                bind_path = os.path.join(host_temp_dir, "temp", rel)
+        else:
+            bind_path = absolute_data_path
+    else:
+        bind_path = absolute_data_path
+
     container = client.containers.run(
         image="ai-sandbox:latest",
         name=container_name,
@@ -151,7 +167,7 @@ def _ensure_sandbox_started(data_folder_path: str):
         network_disabled=True,
         mem_limit=SANDBOX_MEM_LIMIT,
         cpu_quota=SANDBOX_CPU_QUOTA,
-        volumes={absolute_data_path: {"bind": "/app/data", "mode": "rw"}},
+        volumes={bind_path: {"bind": "/app/data", "mode": "rw"}},
         working_dir="/app",
         detach=True,
         auto_remove=True,  # Docker will automatically clean it up when process exits
