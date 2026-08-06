@@ -110,6 +110,7 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
     let currentSessionId = sessionId
     const ac = new AbortController()
     abortRef.current = ac
+    const startTime = Date.now()
 
     replaceMessages([
       ...priorMessages,
@@ -159,6 +160,19 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
         return out
       })
     } finally {
+      const executionTime = parseFloat(((Date.now() - startTime) / 1000).toFixed(1))
+      accumulated.executionTime = executionTime
+
+      updateMessages(prev => {
+        if (!prev.length) return prev
+        const out = prev.slice()
+        const last = out[out.length - 1]
+        if (last && last.role === 'assistant') {
+          out[out.length - 1] = { ...last, executionTime }
+        }
+        return out
+      })
+
       abortRef.current = null
       activeJobIdRef.current = null
       setLoading(false)
@@ -168,7 +182,8 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
         ...priorMessages.map(m => ({
           role: m.role, content: m.content || '',
           parts: m.parts || [], codeSteps: m.codeSteps || [], images: m.images || [],
-          taskWidget: m.taskWidget || null
+          taskWidget: m.taskWidget || null,
+          executionTime: m.executionTime || null,
         })),
         { role: 'user', content: userLabel, parts: [{ type: 'text', content: userLabel }], codeSteps: [], images: [] },
         {
@@ -177,7 +192,8 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
           parts: accumulated.parts,
           codeSteps: accumulated.codeSteps,
           images: accumulated.images,
-          taskWidget: accumulated.taskWidget || null
+          taskWidget: accumulated.taskWidget || null,
+          executionTime: executionTime,
         },
       ]
       const firstUser = toSave.find(m => m.role === 'user')
@@ -192,7 +208,7 @@ export function useChatStream({ projectId, sessionId, setSessionId }) {
       }
       setFileRefreshTrigger(t => t + 1)
     }
-  }, [loading, sessionId, setSessionId, projectId, replaceMessages, processEventStream])
+  }, [loading, sessionId, setSessionId, projectId, replaceMessages, processEventStream, updateMessages])
 
   const handleStopGeneration = useCallback(() => {
     if (activeJobIdRef.current) {

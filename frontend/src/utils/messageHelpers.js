@@ -29,6 +29,7 @@ export function hydrateMessage(m) {
           : []),
     images: m.images || [],
     codeSteps: m.codeSteps || [],
+    executionTime: m.executionTime ?? m.responseTime ?? null,
   }
 }
 
@@ -48,6 +49,8 @@ export function makeAssistantPlaceholder() {
     parts: [],
     images: [],
     codeSteps: [],
+    startTime: Date.now(),
+    executionTime: null,
   }
 }
 
