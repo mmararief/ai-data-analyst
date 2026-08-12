@@ -15,6 +15,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from backend.agent.llm import build_llm
 from backend.agent.prompts import build_system_prompt
+from backend.core.dataframe_utils import build_sandbox_read_code, build_data_inject_code, _DATA_INJECT_READERS
 from sandbox import run_ai_code_securely, stream_ai_code_securely
 
 logger = logging.getLogger(__name__)
@@ -427,20 +428,7 @@ print(f"DONE:{{out_path}}")
         clean_name = Path(filename).name
         ext = Path(clean_name).suffix.lower()
 
-        read_snippet = {
-            ".csv": (
-                f"for _enc in ('utf-8', 'latin-1', 'cp1252', 'utf-8-sig'):\n"
-                f"    try:\n"
-                f"        df = pd.read_csv('/app/data/{clean_name}', encoding=_enc); break\n"
-                f"    except Exception:\n"
-                f"        df = None\n"
-                f"if df is None: raise ValueError('Encoding tidak dikenali')\n"
-            ),
-            ".xlsx": f"df = pd.read_excel('/app/data/{clean_name}')",
-            ".xls":  f"df = pd.read_excel('/app/data/{clean_name}')",
-            ".json": f"df = pd.read_json('/app/data/{clean_name}')",
-            ".parquet": f"df = pd.read_parquet('/app/data/{clean_name}')",
-        }.get(ext, f"df = pd.read_csv('/app/data/{clean_name}')")
+        read_snippet = build_sandbox_read_code(clean_name, ext)
 
         code = (
             "import pandas as pd, json\n"
@@ -517,44 +505,20 @@ print(f"DONE:{{out_path}}")
 
         data_inject = ""
         if not _has_data_load:
-            # Scan folder for the first usable data file and auto-inject loading code
-            _data_exts = {
-                ".csv":     "pd.read_csv('/app/data/{name}', encoding='utf-8')",
-                ".xlsx":    "pd.read_excel('/app/data/{name}')",
-                ".xls":     "pd.read_excel('/app/data/{name}')",
-                ".json":    "pd.read_json('/app/data/{name}')",
-                ".parquet": "pd.read_parquet('/app/data/{name}')",
-            }
             _skip_prefixes = ("_chart_", "_ctx_", "_exec_")
             for _f in sorted(data_folder.iterdir()):
                 if _f.name.startswith(_skip_prefixes) or not _f.is_file():
                     continue
                 _ext = _f.suffix.lower()
-                if _ext in _data_exts:
-                    _read_expr = _data_exts[_ext].format(name=_f.name)
-                    if _ext == ".csv":
-                        # Use encoding-fallback for CSV robustness
+                if _ext in _DATA_INJECT_READERS:
+                    inject_body = build_data_inject_code(_f.name, _ext)
+                    if inject_body:
                         data_inject = (
                             f"# Auto-injected: load data file\n"
                             f"if 'df' not in globals():\n"
-                            f"    _df_loaded = False\n"
-                            f"    for _enc in ('utf-8', 'latin-1', 'cp1252', 'utf-8-sig'):\n"
-                            f"        try:\n"
-                            f"            df = pd.read_csv('/app/data/{_f.name}', encoding=_enc)\n"
-                            f"            _df_loaded = True\n"
-                            f"            break\n"
-                            f"        except Exception:\n"
-                            f"            pass\n"
-                            f"    if not _df_loaded:\n"
-                            f"        raise ValueError('Tidak bisa membaca {_f.name}')\n\n"
+                            + inject_body + "\n"
                         )
-                    else:
-                        data_inject = (
-                            f"# Auto-injected: load data file\n"
-                            f"if 'df' not in globals():\n"
-                            f"    df = {_read_expr}\n\n"
-                        )
-                    _push(f"⚡ Auto-inject data loading: {_f.name}")
+                        _push(f"⚡ Auto-inject data loading: {_f.name}")
                     break
 
         # ── Clean agent code: strip plt.show(), redirect plt.savefig(), strip plt.close() ──
@@ -674,25 +638,7 @@ print(f"DONE:{{out_path}}")
         out_html_name = f"{stem}_profile.html"
         out_html_path = data_folder / out_html_name
 
-        # Build encoding-aware read code to handle any encoding (utf-8, latin-1, cp1252, etc.)
-        _csv_read = (
-            "for _enc in ('utf-8', 'latin-1', 'cp1252', 'utf-8-sig'):\n"
-            "    try:\n"
-            f"        df = pd.read_csv('/app/data/{clean_name}', encoding=_enc)\n"
-            "        break\n"
-            "    except (UnicodeDecodeError, Exception):\n"
-            "        df = None\n"
-            "if df is None:\n"
-            "    raise ValueError('Tidak bisa membaca file CSV — encoding tidak dikenali')\n"
-        )
-        read_code = {
-            ".csv": _csv_read,
-            ".xlsx": f"df = pd.read_excel('/app/data/{clean_name}')",
-            ".xls": f"df = pd.read_excel('/app/data/{clean_name}')",
-            ".json": f"df = pd.read_json('/app/data/{clean_name}')",
-            ".parquet": f"df = pd.read_parquet('/app/data/{clean_name}')",
-        }.get(ext, _csv_read)
-
+        read_code = build_sandbox_read_code(clean_name, ext)
 
         # Inject variables into the template (no f-string conflicts)
         profile_code = (

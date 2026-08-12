@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.core.security import get_current_user
@@ -19,6 +18,7 @@ from backend.core.job_store import (
     create_job, get_status, get_events_from, enqueue_job,
     set_active_job, get_active_job, clear_active_job,
 )
+from backend.core.responses import sse_response
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -40,11 +40,17 @@ class StartRequest(BaseModel):
     mode: Optional[str] = "full"
     approved_plan: Optional[list] = None
 
+
+def _history_to_tuples(history: Optional[List[HistoryMessage]]) -> list[tuple[str, str]]:
+    """Convert a list of HistoryMessage models to (role, content) tuples."""
+    return [(m.role, m.content) for m in history] if history else []
+
+
 # ── Existing endpoints (kept for backward compat) ──────────────────────────
 
 @router.post("/stream")
 def chat_stream(req: ChatRequest, user: UserInDB = Depends(get_current_user)):
-    history = [(m.role, m.content) for m in req.history] if req.history else []
+    history = _history_to_tuples(req.history)
     user_id = user.user_id
 
     def event_generator():
@@ -57,11 +63,7 @@ def chat_stream(req: ChatRequest, user: UserInDB = Depends(get_current_user)):
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
 
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return sse_response(event_generator())
 
 
 # ── New job-based endpoints ─────────────────────────────────────────────────
@@ -75,7 +77,7 @@ def chat_start(req: StartRequest, user: UserInDB = Depends(get_current_user)):
     job_id = str(uuid.uuid4())
     session_id = req.session_id or str(uuid.uuid4())
     user_id = user.user_id
-    history = [(m.role, m.content) for m in req.history] if req.history else []
+    history = _history_to_tuples(req.history)
 
     create_job(user_id, job_id)
     set_active_job(user_id, session_id, job_id, req.question)
@@ -123,11 +125,7 @@ def chat_events(
 
             time.sleep(0.05)
 
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+    return sse_response(event_stream())
 
 
 @router.get("/job/{job_id}")

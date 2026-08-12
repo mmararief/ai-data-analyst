@@ -17,6 +17,18 @@ from backend.core.redis_store import list_sessions, delete_sessions_for_project
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
+def _get_user_project(db: Session, project_id: str, user_id: str) -> ProjectRow:
+    """Fetch a project owned by the given user, or raise 404."""
+    row = (
+        db.query(ProjectRow)
+        .filter(ProjectRow.project_id == project_id, ProjectRow.user_id == user_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(404, "Project tidak ditemukan")
+    return row
+
+
 class CreateProjectRequest(BaseModel):
     name: str
     description: str = ""
@@ -84,13 +96,7 @@ def get_project(
     user: UserInDB = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    row = (
-        db.query(ProjectRow)
-        .filter(ProjectRow.project_id == project_id, ProjectRow.user_id == user.user_id)
-        .first()
-    )
-    if not row:
-        raise HTTPException(404, "Project tidak ditemukan")
+    row = _get_user_project(db, project_id, user.user_id)
     files = list_user_objects(user.user_id, project_id=project_id)
     sessions = list_sessions(user.user_id, project_id=project_id)
     return {
@@ -111,13 +117,7 @@ def update_project(
     user: UserInDB = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    row = (
-        db.query(ProjectRow)
-        .filter(ProjectRow.project_id == project_id, ProjectRow.user_id == user.user_id)
-        .first()
-    )
-    if not row:
-        raise HTTPException(404, "Project tidak ditemukan")
+    row = _get_user_project(db, project_id, user.user_id)
     if req.name is not None:
         row.name = req.name.strip()
     if req.description is not None:
@@ -137,13 +137,7 @@ def delete_project(
     user: UserInDB = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    row = (
-        db.query(ProjectRow)
-        .filter(ProjectRow.project_id == project_id, ProjectRow.user_id == user.user_id)
-        .first()
-    )
-    if not row:
-        raise HTTPException(404, "Project tidak ditemukan")
+    row = _get_user_project(db, project_id, user.user_id)
 
     remove_project_files(user.user_id, project_id)
     delete_sessions_for_project(user.user_id, project_id)
