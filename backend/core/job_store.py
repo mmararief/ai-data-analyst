@@ -12,7 +12,10 @@ Keys (semua dengan TTL 1 jam):
 """
 
 import json
+import logging
 import redis
+
+logger = logging.getLogger(__name__)
 
 _JOB_TTL = 3600  # detik (1 jam)
 _QUEUE_KEY = "queue:jobs"
@@ -77,7 +80,7 @@ def get_events_from(user_id: str, job_id: str, start: int = 0) -> list[dict]:
         try:
             result.append(json.loads(r))
         except (json.JSONDecodeError, TypeError):
-            pass
+            logger.warning("Skipped malformed event in job %s: %.200s", job_id, r)
     return result
 
 
@@ -128,4 +131,8 @@ def dequeue_job(timeout: int = 5) -> dict | None:
     try:
         return json.loads(raw)
     except (json.JSONDecodeError, TypeError):
+        logger.error(
+            "Dropped malformed job payload from queue (not valid JSON): %.200s",
+            raw,
+        )
         return None

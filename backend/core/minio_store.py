@@ -14,6 +14,7 @@ File internal yang disimpan tapi disembunyikan dari listing UI:
 """
 
 import io
+import logging
 import shutil
 import tempfile
 from contextlib import contextmanager
@@ -21,6 +22,8 @@ from pathlib import Path
 
 from minio import Minio
 from minio.error import S3Error
+
+logger = logging.getLogger(__name__)
 
 try:
     from backend.core.config import (
@@ -60,7 +63,7 @@ def _ensure_bucket(client: Minio) -> None:
         if not client.bucket_exists(MINIO_BUCKET):
             client.make_bucket(MINIO_BUCKET)
     except S3Error:
-        pass
+        logger.warning("Failed to ensure MinIO bucket '%s' exists", MINIO_BUCKET, exc_info=True)
 
 
 def _user_prefix(user_id: str, project_id: str | None = None) -> str:
@@ -199,7 +202,7 @@ def remove_project_files(user_id: str, project_id: str) -> None:
         for obj in client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=True):
             client.remove_object(MINIO_BUCKET, obj.object_name)
     except S3Error:
-        pass
+        logger.error("Failed to remove project files for user %s, project %s", user_id, project_id, exc_info=True)
 
 
 def download_user_files(
@@ -223,8 +226,12 @@ def download_user_files(
             dest = target_dir / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             client.fget_object(MINIO_BUCKET, obj.object_name, str(dest))
-    except S3Error:
-        pass
+    except S3Error as exc:
+        logger.error(
+            "Failed to download files for user %s to %s: %s",
+            user_id, target_dir, exc,
+        )
+        raise
 
 
 def upload_generated_files(
@@ -310,5 +317,5 @@ def list_all_project_files(user_id: str, project_id: str) -> list[dict]:
                 "type": "file",
             })
     except S3Error:
-        pass
+        logger.error("Failed to list all project files for user %s, project %s", user_id, project_id, exc_info=True)
     return items

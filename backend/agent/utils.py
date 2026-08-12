@@ -1,9 +1,12 @@
 """Shared utilities, regex constants, schema helpers, and dedup helpers."""
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ── Regex constants ───────────────────────────────────────────────────────────
 
@@ -81,11 +84,7 @@ def load_schema_payload(data_folder: Path) -> dict | None:
         if isinstance(payload, dict) and isinstance(payload.get("datasets"), list):
             return payload
     except Exception:
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "Failed to load schema from %s", schema_path, exc_info=True
-        )
+        logger.warning("Failed to load schema from %s", schema_path, exc_info=True)
         return None
     return None
 
@@ -214,4 +213,4 @@ def cleanup_context_files(data_folder: Path):
         try:
             f.unlink()
         except Exception:
-            pass
+            logger.debug("Failed to remove context file %s", f, exc_info=True)

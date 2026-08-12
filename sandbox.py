@@ -141,8 +141,10 @@ def _ensure_sandbox_started(data_folder_path: str):
     try:
         old = client.containers.get(container_name)
         old.remove(force=True)
-    except Exception:
+    except docker.errors.NotFound:
         pass
+    except Exception:
+        logger.debug("Failed to clean up old sandbox container %s", container_name, exc_info=True)
         
     # Resolve host bind path for Docker-in-Docker / Docker-sibling volume mounting
     host_temp_dir = os.environ.get("HOST_TEMP_DIR") or os.environ.get("HOST_PROJECT_DIR")
@@ -187,13 +189,13 @@ def cleanup_sandbox(data_folder_path: str):
         with open(stop_file, "w") as f:
             f.write("stop")
     except Exception:
-        pass
+        logger.debug("Failed to write sandbox stop file at %s", stop_file, exc_info=True)
         
     if container:
         try:
             container.remove(force=True)
         except Exception:
-            pass
+            logger.debug("Failed to remove sandbox container for %s", absolute_data_path, exc_info=True)
 
 def cleanup_all_sandboxes():
     """Remove all ai-sandbox containers created by this backend."""
@@ -205,7 +207,7 @@ def cleanup_all_sandboxes():
                 container.remove(force=True)
                 logger.info(f"🧹 Removed orphaned sandbox container: {container.name}")
             except Exception:
-                pass
+                logger.warning("Failed to remove orphan container %s", container.name, exc_info=True)
     except Exception as e:
         logger.warning(f"Gagal membersihkan orphan sandboxes: {e}")
 

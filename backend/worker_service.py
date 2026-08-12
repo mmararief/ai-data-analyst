@@ -124,11 +124,11 @@ def process_job(payload: dict) -> None:
         try:
             _auto_save_session(user_id, project_id, session_id, question, history, acc_events)
         except Exception:
-            logger.debug("auto-save failed during error handling", exc_info=True)
+            logger.warning("auto-save failed during error handling for job %s", job_id, exc_info=True)
         try:
             finish_job(user_id, job_id, error=str(exc))
         except Exception:
-            logger.debug("finish_job failed during error handling", exc_info=True)
+            logger.warning("finish_job failed during error handling for job %s", job_id, exc_info=True)
         # Re-raise so the worker loop can log the real failure (and metrics
         # / alerting can react). Without this, _worker_loop misreported
         # every failed job as "completed successfully".
