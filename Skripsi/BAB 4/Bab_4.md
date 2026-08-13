@@ -633,11 +633,11 @@ Hasil persentase UAT dikelompokkan ke dalam kategori tingkat kelayakan untuk dii
 
 | No | Aspek Pernyataan Kuesioner UAT | Skor Responden (1–10) | Total Skor | Skor Maksimal | Persentase Kelayakan | Kategori Kelayakan |
 |:---:|---|---|:---:|:---:|:---:|:---:|
-| 1 | Antarmuka obrolan AnalisAI mudah dipahami dan digunakan oleh pengguna non-teknis. | 4, 5, 4, 4, 5, 5, 4, 4, 5, 4 | 44 | 50 | 88.0% | Sangat Layak |
-| 2 | Respons agen dalam menjawab pertanyaan analisis data relevan dan akurat. | 4, 4, 4, 5, 4, 4, 5, 4, 4, 4 | 42 | 50 | 84.0% | Sangat Layak |
-| 3 | Grafik visualisasi yang disajikan jelas, lengkap, dan informatif. | 4, 5, 5, 4, 4, 5, 4, 5, 4, 5 | 45 | 50 | 90.0% | Sangat Layak |
-| 4 | Kecepatan respons (*streaming*) dan penanganan pekerjaan analisis tergolong cepat. | 4, 4, 4, 4, 3, 4, 5, 4, 4, 4 | 40 | 50 | 80.0% | Layak / Baik |
-| 5 | Fitur ekspor berkas dan widget rencana tugas sangat membantu jalannya analisis. | 5, 5, 4, 5, 4, 5, 5, 4, 4, 4 | 45 | 50 | 90.0% | Sangat Layak |
+| 1 | **Kemudahan Penggunaan**: Antarmuka obrolan AnalisAI mudah dipahami dan digunakan oleh pengguna non-teknis. | 4, 5, 4, 4, 5, 5, 4, 4, 5, 4 | 44 | 50 | 88.0% | Sangat Layak |
+| 2 | **Keakuratan Hasil Analisis**: Respons agen dalam menjawab pertanyaan analisis data relevan, tepat, dan akurat. | 4, 4, 4, 5, 4, 4, 5, 4, 4, 4 | 42 | 50 | 84.0% | Sangat Layak |
+| 3 | **Kualitas Visualisasi**: Grafik visualisasi yang dihasilkan sistem jelas, informatif, dan mudah dipahami. | 4, 5, 5, 4, 4, 5, 4, 5, 4, 5 | 45 | 50 | 90.0% | Sangat Layak |
+| 4 | **Responsivitas Sistem**: Kecepatan respons (*streaming*) dan penanganan pekerjaan analisis tergolong cepat. | 4, 4, 4, 4, 3, 4, 5, 4, 4, 4 | 40 | 50 | 80.0% | Layak / Baik |
+| 5 | **Kepuasan Keseluruhan**: Pengalaman penggunaan platform AnalisAI secara umum sangat memuaskan pengguna. | 5, 5, 4, 5, 4, 5, 5, 4, 4, 4 | 45 | 50 | 90.0% | Sangat Layak |
 | **Total**| **Akumulasi Penilaian Keseluruhan Aspek UAT** | | **216** | **250** | **86.4%** | **Sangat Layak** |
 
 ### Perhitungan Persentase Kelayakan UAT

@@ -4,6 +4,8 @@ Platform analisis data berbasis AI yang menggunakan **single ReAct agent dengan 
 
 > Proyek Skripsi — Muhammad Ammar Arief
 > *"Pengembangan AI Data Analyst Berbasis Large Language Model untuk Analisis Dataset Otomatis Menggunakan Tool Calling dan Python Sandbox"*
+> 
+> **Live Demo Website:** [http://analisai.my.id/](http://analisai.my.id/)
 
 ## Fitur Utama
 

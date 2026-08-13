@@ -9,11 +9,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    from backend.core.config import SANDBOX_TIMEOUT, SANDBOX_MEM_LIMIT, SANDBOX_CPU_QUOTA
+    from backend.core.config import SANDBOX_TIMEOUT, SANDBOX_MEM_LIMIT, SANDBOX_CPU_QUOTA, TEMP_ROOT
 except ImportError:
     SANDBOX_TIMEOUT = 120
     SANDBOX_MEM_LIMIT = "512m"
     SANDBOX_CPU_QUOTA = 100000
+    TEMP_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
 
 _ALLOWED_IMPORTS = {
     "pandas", "numpy", "matplotlib", "seaborn", "plotly",
@@ -98,9 +99,14 @@ def main():
             try:
                 with contextlib.redirect_stdout(stdout_cap), contextlib.redirect_stderr(stderr_cap):
                     exec(code, global_ctx)
-            except Exception:
-                stderr_cap.write(traceback.format_exc())
-                status = "error"
+            except BaseException as e:
+                if isinstance(e, SystemExit):
+                    if e.code and e.code != 0:
+                        stderr_cap.write(f"SystemExit: {e.code}\\n")
+                        status = "error"
+                else:
+                    stderr_cap.write(traceback.format_exc())
+                    status = "error"
                 
             res = {
                 "status": status,
@@ -126,7 +132,14 @@ def _ensure_sandbox_started(data_folder_path: str):
     absolute_data_path = os.path.abspath(data_folder_path)
     os.makedirs(absolute_data_path, exist_ok=True)
     if absolute_data_path in _active_containers:
-        return _active_containers[absolute_data_path]
+        container = _active_containers[absolute_data_path]
+        try:
+            container.reload()
+            if container.status == "running":
+                return container
+        except Exception:
+            pass
+        _active_containers.pop(absolute_data_path, None)
         
     client = docker.from_env()
     
@@ -293,7 +306,14 @@ def run_bash_in_sandbox(command: str, data_folder_path: str) -> str:
             res = container.exec_run(["bash", "-c", command], workdir="/app/data")
             return res.output.decode("utf-8", errors="replace")
         except Exception as e:
-            return f"Bash execution failed: {str(e)}"
+            # If execution failed due to stale container, clear and retry once
+            _active_containers.pop(absolute_data_path, None)
+            try:
+                container = _ensure_sandbox_started(absolute_data_path)
+                res = container.exec_run(["bash", "-c", command], workdir="/app/data")
+                return res.output.decode("utf-8", errors="replace")
+            except Exception as retry_exc:
+                return f"Bash execution failed: {str(retry_exc)}"
 
 if __name__ == "__main__":
     test_code = "import os\nx = 5\nprint('Hello Stateful Sandbox!')"
