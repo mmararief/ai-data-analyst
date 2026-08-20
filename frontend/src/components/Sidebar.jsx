@@ -1,10 +1,11 @@
-﻿import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
 import DataPreviewModal from './DataPreviewModal'
 import DashboardViewer from './chat/DashboardViewer'
 
 const MAX_FILES_PER_UPLOAD = 20
+const MAX_FILE_SIZE_MB = 25
 
 const FILE_COLORS = {
   csv: '#38bdf8', xlsx: '#22c55e', xls: '#22c55e',
@@ -216,6 +217,11 @@ export default function Sidebar({ projectId, sessionId, onSuggest, onLoadHistory
     try {
       for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i]
+        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+          failedUploads.push(`${file.name}: Ukuran file (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimum ${MAX_FILE_SIZE_MB} MB`)
+          setUploadProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+          continue
+        }
         const form = new FormData()
         form.append('file', file)
         form.append('batch_total', String(fileList.length))
@@ -443,9 +449,42 @@ export default function Sidebar({ projectId, sessionId, onSuggest, onLoadHistory
                       </svg>
                       Tambah Dataset
                     </div>
-                    <span style={{ fontSize: '9px', color: textMuted }}>
-                      Klik atau seret file ke sini
+                    <span style={{ fontSize: '9.5px', color: textMuted, marginTop: '1px' }}>
+                      Klik atau seret berkas ke sini
                     </span>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '0.2rem',
+                      marginTop: '0.35rem',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: '7.5px',
+                      color: textMuted,
+                      width: '100%',
+                    }}>
+                      <span style={{
+                        padding: '1.5px 6px',
+                        borderRadius: '4px',
+                        background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                        border: `1px solid ${borderCol}`,
+                        textAlign: 'center',
+                        letterSpacing: '0.02em',
+                      }}>
+                        CSV, XLSX, XLS, JSON, PARQUET, PKL
+                      </span>
+                      <span style={{
+                        padding: '1.5px 6px',
+                        borderRadius: '4px',
+                        background: isDark ? 'rgba(56,189,248,0.08)' : 'rgba(11,87,208,0.06)',
+                        color: cyanAccent,
+                        border: `1px solid ${isDark ? 'rgba(56,189,248,0.2)' : 'rgba(11,87,208,0.15)'}`,
+                        fontWeight: 600,
+                        textAlign: 'center',
+                      }}>
+                        Maks. 25 MB / berkas (Hingga 20 berkas)
+                      </span>
+                    </div>
                   </>
                 )}
               </div>
