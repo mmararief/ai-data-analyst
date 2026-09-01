@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import api from '../api'
@@ -215,7 +215,7 @@ function ProjectCard({ project, index, onNavigate, onEdit, onDelete }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function DashboardPage({ username, onLogout }) {
+export default function DashboardPage({ username, role, onLogout }) {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -321,6 +321,29 @@ export default function DashboardPage({ username, onLogout }) {
                 }} />
                 {username}
               </div>
+
+              {/* Admin Button */}
+              {role === 'admin' && (
+                <button
+                  onClick={() => navigate('/admin')}
+                  title="Buka Halaman Admin"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.35rem',
+                    height: 32, padding: '0 0.75rem', borderRadius: 7,
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    color: '#ef4444',
+                    fontFamily: "'JetBrains Mono', monospace", fontSize: '0.7rem', fontWeight: 700,
+                    cursor: 'pointer', transition: 'all 0.2s',
+                  }}
+                >
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Admin
+                </button>
+              )}
 
               {/* Theme toggle */}
               <button

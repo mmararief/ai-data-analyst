@@ -182,7 +182,8 @@ export default function AuthPage({ onLogin }) {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         })
         localStorage.setItem('token', res.data.access_token)
-        onLogin(username)
+        localStorage.setItem('role', res.data.role || 'user')
+        onLogin(username, res.data.role || 'user')
       }
     } catch (err) {
       setError(err.response?.data?.detail || 'Terjadi kesalahan')

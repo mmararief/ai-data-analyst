@@ -107,6 +107,9 @@ def process_job(payload: dict) -> None:
         logger.info(f"💾 Auto-saving session history...")
         _auto_save_session(user_id, project_id, session_id, question, history, acc_events)
 
+        # Record token usage for this job
+        _record_job_token_usage(user_id, job_id, project_id, question, history, acc_events)
+
         if is_cancelled:
             logger.info(f"🛑 Job {job_id} marked as cancelled.")
         else:
@@ -248,3 +251,48 @@ def _auto_save_session(
         )
     except Exception as exc:
         logger.warning("Auto-save session %s failed: %s", session_id, exc)
+
+
+def _record_job_token_usage(
+    user_id: str,
+    job_id: str,
+    project_id: str,
+    question: str,
+    history: list,
+    events: list,
+) -> None:
+    """Calculate and persist token usage for the completed analysis job."""
+    try:
+        from backend.core.database import SessionLocal, UserTokenUsageRow
+        from backend.core.config import MODEL_CHAT
+
+        prompt_text = question + " " + " ".join(
+            [h[1] for h in (history or []) if isinstance(h, (list, tuple)) and len(h) > 1 and isinstance(h[1], str)]
+        )
+        output_text = " ".join(
+            [ev.get("content", "") for ev in events if isinstance(ev.get("content"), str)]
+        )
+
+        prompt_tokens = max(1, len(prompt_text) // 4)
+        completion_tokens = max(1, len(output_text) // 4)
+        total_tokens = prompt_tokens + completion_tokens
+
+        db = SessionLocal()
+        try:
+            row = UserTokenUsageRow(
+                user_id=user_id,
+                job_id=job_id,
+                project_id=project_id,
+                model_name=MODEL_CHAT or "chat-model",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+            )
+            db.add(row)
+            db.commit()
+            logger.info("📊 Recorded token usage for user %s: %d tokens (prompt=%d, completion=%d)", user_id, total_tokens, prompt_tokens, completion_tokens)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.debug("Failed to record token usage: %s", exc)
+
