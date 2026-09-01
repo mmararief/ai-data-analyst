@@ -216,6 +216,7 @@ function ProjectCard({ project, index, onNavigate, onEdit, onDelete }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function DashboardPage({ username, role, onLogout }) {
+  const [userRole, setUserRole] = useState(() => role || localStorage.getItem('role') || 'user')
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -225,6 +226,16 @@ export default function DashboardPage({ username, role, onLogout }) {
   const [searchFocused, setSearchFocused] = useState(false)
   const navigate = useNavigate()
   const { theme, toggleTheme } = useTheme()
+
+  useEffect(() => {
+    if (role) setUserRole(role)
+    api.get('/auth/me').then(res => {
+      if (res.data?.role) {
+        setUserRole(res.data.role)
+        localStorage.setItem('role', res.data.role)
+      }
+    }).catch(() => {})
+  }, [role])
 
   const fetchProjects = async () => {
     try {
@@ -323,7 +334,7 @@ export default function DashboardPage({ username, role, onLogout }) {
               </div>
 
               {/* Admin Button */}
-              {role === 'admin' && (
+              {userRole === 'admin' && (
                 <button
                   onClick={() => navigate('/admin')}
                   title="Buka Halaman Admin"
