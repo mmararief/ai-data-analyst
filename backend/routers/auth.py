@@ -9,7 +9,7 @@ from slowapi.util import get_remote_address
 
 from backend.core.security import (
     verify_password, hash_password, create_access_token,
-    create_refresh_token, verify_refresh_token,
+    create_refresh_token, verify_refresh_token, get_current_user,
 )
 from backend.core.database import get_db, UserRow
 from backend.models.user import UserInDB
