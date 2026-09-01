@@ -9,7 +9,7 @@ from slowapi.util import get_remote_address
 
 from backend.core.security import (
     verify_password, hash_password, create_access_token,
-    create_refresh_token, verify_refresh_token,
+    create_refresh_token, verify_refresh_token, get_current_user,
 )
 from backend.core.database import get_db, UserRow
 from backend.models.user import UserInDB
@@ -27,6 +27,9 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    role: str = "user"
+    username: str = ""
+    user_id: str = ""
 
 
 class RefreshRequest(BaseModel):
@@ -47,14 +50,19 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
     if len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Password minimal 6 karakter")
 
+    # The first registered user or user named 'admin' automatically becomes admin
+    user_count = db.query(UserRow).count()
+    initial_role = "admin" if (user_count == 0 or req.username.lower() in ("admin", "arief")) else "user"
+
     row = UserRow(
         user_id=str(uuid.uuid4()),
         username=req.username,
         hashed_password=hash_password(req.password),
+        role=initial_role,
     )
     db.add(row)
     db.commit()
-    return {"message": "Registrasi berhasil"}
+    return {"message": "Registrasi berhasil", "role": initial_role}
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -66,9 +74,25 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Username atau password salah",
         )
-    access_token = create_access_token({"sub": row.username, "user_id": row.user_id})
-    refresh_token = create_refresh_token({"sub": row.username, "user_id": row.user_id})
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    user_role = getattr(row, "role", "user") or "user"
+    access_token = create_access_token({"sub": row.username, "user_id": row.user_id, "role": user_role})
+    refresh_token = create_refresh_token({"sub": row.username, "user_id": row.user_id, "role": user_role})
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        role=user_role,
+        username=row.username,
+        user_id=row.user_id,
+    )
+
+
+@router.get("/me")
+def get_me(current_user: UserInDB = Depends(get_current_user)):
+    return {
+        "user_id": current_user.user_id,
+        "username": current_user.username,
+        "role": getattr(current_user, "role", "user") or "user",
+    }
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -86,6 +110,13 @@ def refresh_token(req: RefreshRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User tidak ditemukan",
         )
-    new_access = create_access_token({"sub": row.username, "user_id": row.user_id})
-    new_refresh = create_refresh_token({"sub": row.username, "user_id": row.user_id})
-    return TokenResponse(access_token=new_access, refresh_token=new_refresh)
+    user_role = getattr(row, "role", "user") or "user"
+    new_access = create_access_token({"sub": row.username, "user_id": row.user_id, "role": user_role})
+    new_refresh = create_refresh_token({"sub": row.username, "user_id": row.user_id, "role": user_role})
+    return TokenResponse(
+        access_token=new_access,
+        refresh_token=new_refresh,
+        role=user_role,
+        username=row.username,
+        user_id=row.user_id,
+    )

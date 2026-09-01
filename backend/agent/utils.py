@@ -1,14 +1,9 @@
 """Shared utilities, regex constants, schema helpers, and dedup helpers."""
 
-import base64
 import json
-import queue
 import re
-import threading
 from pathlib import Path
 from typing import Any
-
-from sandbox import run_ai_code_securely
 
 # ── Regex constants ───────────────────────────────────────────────────────────
 
@@ -47,20 +42,6 @@ def trim_content(text: str, max_len: int) -> str:
         return text
     half = max_len // 2
     return text[:half] + "\n... [dipotong] ...\n" + text[-half:]
-
-
-def build_history_context(history: list[tuple[str, str]] | None) -> str:
-    """Build a compact history string for injection into agent prompts."""
-    from backend.core.config import MAX_HISTORY_MESSAGES, MAX_HISTORY_CONTENT_LEN
-
-    if not history:
-        return ""
-    trimmed = history[-MAX_HISTORY_MESSAGES:]
-    lines = []
-    for role, content in trimmed:
-        speaker = "User" if role == "user" else "AI"
-        lines.append(f"{speaker}: {trim_content(content, MAX_HISTORY_CONTENT_LEN)}")
-    return "\n\nRiwayat percakapan sebelumnya:\n" + "\n".join(lines)
 
 
 # ── File / schema helpers ─────────────────────────────────────────────────────
@@ -200,12 +181,6 @@ def answer_simple_task_from_schema(data_folder: Path, question: str) -> str | No
     return None
 
 
-def format_distribution(distribution: dict[str, Any]) -> str:
-    if not distribution:
-        return "- Tidak ada ringkasan distribusi"
-    return "\n".join(f"- {key}: {value}" for key, value in distribution.items())
-
-
 # ── Dedup helpers ─────────────────────────────────────────────────────────────
 
 def parse_json_from_llm(raw: str) -> Any | None:
@@ -231,86 +206,6 @@ def parse_json_from_llm(raw: str) -> Any | None:
         except (json.JSONDecodeError, ValueError):
             pass
     return None
-
-
-def extract_chart_images(raw_output: str, data_folder: Path):
-    """Yield (type, content) tuples for chart images found in tool output."""
-    for match in CHART_RE.finditer(raw_output):
-        chart_filename = Path(match.group(1).strip()).name
-        local_chart = data_folder / chart_filename
-        if local_chart.exists():
-            with open(local_chart, "rb") as chart_file:
-                img_b64 = base64.b64encode(chart_file.read()).decode()
-            try:
-                local_chart.unlink()
-            except Exception:
-                pass
-            yield {"type": "image", "content": img_b64}
-
-
-class TrainingResult:
-    """Wrapper yielded as the last item from ``run_training_with_progress``."""
-    __slots__ = ("value",)
-
-    def __init__(self, value):
-        self.value = value
-
-
-def run_training_with_progress(train_fn, timeout_seconds: int = 600):
-    """Run a training function in a background thread, yielding progress events.
-
-    ``train_fn`` receives a single ``progress_callback`` keyword argument.
-    Progress events are ``{"type": "progress", "content": msg}``.
-    The **last** yielded item is a :class:`TrainingResult` wrapping the return
-    value of *train_fn*.  Raises if *train_fn* raised.
-    """
-    progress_q: queue.Queue = queue.Queue()
-    result_holder: list = [None]
-    err_holder: list = [None]
-
-    def _worker():
-        try:
-            result_holder[0] = train_fn(progress_callback=progress_q.put)
-        except Exception as e:
-            err_holder[0] = e
-        finally:
-            progress_q.put(None)
-
-    t = threading.Thread(target=_worker, daemon=True)
-    t.start()
-    elapsed = 0.0
-    poll_interval = 0.1
-    while True:
-        try:
-            msg = progress_q.get(timeout=poll_interval)
-        except queue.Empty:
-            elapsed += poll_interval
-            if elapsed >= timeout_seconds:
-                # Training thread still alive after timeout → give up.
-                if t.is_alive():
-                    raise TimeoutError(f"Training timed out after {timeout_seconds}s")
-            continue
-        if msg is None:
-            break
-        yield {"type": "progress", "content": msg}
-
-    t.join()
-
-    if err_holder[0] is not None:
-        raise err_holder[0]
-    yield TrainingResult(result_holder[0])
-
-
-def run_structured_code_step(data_folder: Path, code: str):
-    """Execute a deterministic Python step and emit code/output/image events."""
-    yield {"type": "code", "content": code}
-    raw_output = run_ai_code_securely(code, data_folder_path=str(data_folder))
-
-    yield from extract_chart_images(raw_output, data_folder)
-
-    clean_output = CHART_RE.sub("", IMAGE_RE.sub("", raw_output)).strip()
-    if clean_output:
-        yield {"type": "output", "content": clean_output}
 
 
 def cleanup_context_files(data_folder: Path):

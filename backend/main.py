@@ -9,7 +9,7 @@ from sqlalchemy import text as sa_text
 
 from backend.core.database import init_db, engine
 from backend.core.config import APP_ENV, SECRET_KEY, ALLOWED_ORIGINS, REDIS_URL, MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY, MINIO_BUCKET
-from backend.routers import auth, datasets, chat, notebook, history, projects
+from backend.routers import auth, datasets, chat, notebook, history, projects, admin
 
 
 @asynccontextmanager
@@ -35,6 +35,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(datasets.router)
+app.include_router(admin.router)
 
 app.include_router(chat.router)
 app.include_router(notebook.router)

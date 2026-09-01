@@ -4,7 +4,10 @@ import json
 import logging
 import queue
 import re
+import ipaddress
+import socket
 from pathlib import Path
+from urllib.parse import urlparse
 
 from langchain_core.tools import tool
 from langgraph.prebuilt import create_react_agent
@@ -15,6 +18,33 @@ from backend.agent.prompts import build_system_prompt
 from sandbox import run_ai_code_securely, stream_ai_code_securely
 
 logger = logging.getLogger(__name__)
+
+
+def _assert_url_safe(url: str) -> None:
+    """SSRF guard: reject non-http(s) schemes and hosts that resolve to
+    private/loopback/link-local/reserved IPs (incl. cloud metadata endpoints).
+
+    Raises ValueError when the URL is not safe to fetch from the backend host.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Skema URL tidak diizinkan: '{parsed.scheme or '(kosong)'}'. Hanya http/https.")
+    host = parsed.hostname
+    if not host:
+        raise ValueError("URL tidak memiliki host yang valid.")
+    try:
+        addr_infos = socket.getaddrinfo(host, None)
+    except Exception as exc:
+        raise ValueError(f"Tidak bisa me-resolve host '{host}': {exc}")
+    for info in addr_infos:
+        ip_str = info[4][0]
+        try:
+            ip = ipaddress.ip_address(ip_str)
+        except ValueError:
+            continue
+        if (ip.is_private or ip.is_loopback or ip.is_link_local
+                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
+            raise ValueError(f"Akses ke alamat internal/privat diblokir ({ip_str}).")
 
 
 # ── Profile code template (no f-string — use str.replace for placeholders) ──
@@ -214,17 +244,19 @@ def create_agent(
     def python_repl_tool(code: str) -> str:
         """Eksekusi kode Python/Pandas/SQL di sandbox terisolasi. Gunakan untuk kalkulasi, transformasi data, query, atau operasi file yang tidak dicakup tool lain."""
         code = "import warnings\nwarnings.filterwarnings('ignore')\n" + code
+        status_box: list = []
         if progress_queue is not None:
             accumulated = []
-            for line in stream_ai_code_securely(code, data_folder_path=folder_str):
+            for line in stream_ai_code_securely(code, data_folder_path=folder_str, status_out=status_box):
                 accumulated.append(line)
                 if line.rstrip():
                     _push(line.rstrip())
             output = "".join(accumulated)
         else:
-            output = run_ai_code_securely(code, data_folder_path=folder_str)
+            output = run_ai_code_securely(code, data_folder_path=folder_str, status_out=status_box)
 
-        if "Error" in output or "Traceback" in output:
+        status = status_box[0] if status_box else "success"
+        if status == "error":
             return json.dumps({"status": "error", "output": output[:1000]}, ensure_ascii=False)
         return json.dumps({"status": "success", "output": output[:3000]}, ensure_ascii=False)
 
@@ -248,134 +280,95 @@ def create_agent(
     def file_export_tool(content: str, filename: str, format: str = "md") -> str:
         """Simpan konten teks ke file (ipynb, csv, xlsx, json, md, html, txt, py). Gunakan untuk mengekspor hasil analisis, notebook, atau laporan — BUKAN untuk visualisasi chart (gunakan render_chart_tool) atau profiling dataset (gunakan data_profile_tool). Semua file hasil ekspor disimpan di subfolder 'exports/'."""
 
-        fmt = format.lower().strip().lstrip(".")
-        fname = Path(filename).stem
+        fmt = re.sub(r"[^a-z0-9]", "", format.lower().strip().lstrip("."))
+        fname = re.sub(r"[^A-Za-z0-9_\-]", "_", Path(filename).stem) or "export"
 
         exports_folder = data_folder / "exports"
         exports_folder.mkdir(exist_ok=True)
+        out_path = exports_folder / f"{fname}.{fmt}"
 
-        # Write content to a temporary file in the sandbox folder
-        import uuid
-        temp_id = str(uuid.uuid4())
-        temp_input_path = data_folder / f"temp_input_{temp_id}.txt"
-        with open(temp_input_path, "w", encoding="utf-8") as f:
-            f.write(content)
+        if fmt == "ipynb":
+            done = False
+            try:
+                parsed_content = json.loads(content)
+                if isinstance(parsed_content, dict) and "cells" in parsed_content:
+                    with open(out_path, "w", encoding="utf-8") as f:
+                        json.dump(parsed_content, f, ensure_ascii=False, indent=2)
+                    done = True
+            except Exception:
+                pass
 
-        # Execute export logic inside sandbox
-        script_code = f"""
-import os
-import json
-import re
+            if not done:
+                cells = []
+                code_block_re = re.compile(r"```(?:python)?\n(.*?)```", re.DOTALL)
+                parts = code_block_re.split(content)
+                for i, part in enumerate(parts):
+                    text = part.strip()
+                    if not text:
+                        continue
+                    if i % 2 == 1:
+                        cells.append({
+                            "cell_type": "code",
+                            "execution_count": None,
+                            "metadata": {},
+                            "outputs": [],
+                            "source": [ln + "\n" for ln in text.split("\n")],
+                        })
+                    else:
+                        cells.append({
+                            "cell_type": "markdown",
+                            "metadata": {},
+                            "source": [ln + "\n" for ln in text.split("\n")],
+                        })
 
-data_dir = '/app/data/exports'
-os.makedirs(data_dir, exist_ok=True)
-fmt = '{fmt}'
-fname = '{fname}'
-temp_input = '/app/data/temp_input_{temp_id}.txt'
+                notebook = {
+                    "nbformat": 4,
+                    "nbformat_minor": 5,
+                    "metadata": {
+                        "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+                        "language_info": {"name": "python", "version": "3.10.0"},
+                    },
+                    "cells": cells or [{"cell_type": "markdown", "metadata": {}, "source": [content]}],
+                }
+                with open(out_path, "w", encoding="utf-8") as f:
+                    json.dump(notebook, f, ensure_ascii=False, indent=2)
 
-with open(temp_input, 'r', encoding='utf-8') as f:
-    content = f.read()
+        elif fmt == "xlsx":
+            try:
+                import io
+                import pandas as pd
+                try:
+                    df = pd.read_csv(io.StringIO(content))
+                except Exception:
+                    lines = [line.split(",") for line in content.strip().splitlines()]
+                    if len(lines) > 1:
+                        df = pd.DataFrame(lines[1:], columns=lines[0])
+                    else:
+                        df = pd.DataFrame({"content": content.splitlines()})
+                df.to_excel(out_path, index=False, engine="openpyxl")
+            except Exception as exc:
+                return json.dumps({
+                    "type": "file_export",
+                    "error": f"Gagal mengekspor file xlsx: {exc}",
+                }, ensure_ascii=False)
 
-out_path = os.path.join(data_dir, f"{{fname}}.{{fmt}}")
+        elif fmt == "json":
+            try:
+                parsed = json.loads(content)
+                with open(out_path, "w", encoding="utf-8") as f:
+                    json.dump(parsed, f, ensure_ascii=False, indent=2)
+            except json.JSONDecodeError:
+                with open(out_path, "w", encoding="utf-8") as f:
+                    f.write(content)
 
-if fmt == "ipynb":
-    try:
-        parsed_content = json.loads(content)
-        if isinstance(parsed_content, dict) and "cells" in parsed_content:
-            with open(out_path, 'w', encoding='utf-8') as f:
-                json.dump(parsed_content, f, ensure_ascii=False, indent=2)
-            print(f"DONE:{{out_path}}")
-            exit(0)
-    except Exception:
-        pass
-
-    cells = []
-    code_block_re = re.compile(r"```(?:python)?\n(.*?)```", re.DOTALL)
-    parts = code_block_re.split(content)
-    for i, part in enumerate(parts):
-        text = part.strip()
-        if not text:
-            continue
-        if i % 2 == 1:
-            cells.append({{
-                "cell_type": "code",
-                "execution_count": None,
-                "metadata": {{}},
-                "outputs": [],
-                "source": [ln + "\n" for ln in text.split("\n")],
-            }})
+        elif fmt in ("csv", "md", "html", "txt", "py"):
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(content)
         else:
-            cells.append({{
-                "cell_type": "markdown",
-                "metadata": {{}},
-                "source": [ln + "\n" for ln in text.split("\n")],
-            }})
-
-    notebook = {{
-        "nbformat": 4,
-        "nbformat_minor": 5,
-        "metadata": {{
-            "kernelspec": {{"display_name": "Python 3", "language": "python", "name": "python3"}},
-            "language_info": {{"name": "python", "version": "3.10.0"}},
-        }},
-        "cells": cells or [{{"cell_type": "markdown", "metadata": {{}}, "source": [content]}}],
-    }}
-    with open(out_path, 'w', encoding='utf-8') as f:
-        json.dump(notebook, f, ensure_ascii=False, indent=2)
-
-elif fmt == "xlsx":
-    try:
-        import io
-        import pandas as pd
-        try:
-            df = pd.read_csv(io.StringIO(content))
-        except Exception:
-            lines = [line.split(",") for line in content.strip().splitlines()]
-            if len(lines) > 1:
-                df = pd.DataFrame(lines[1:], columns=lines[0])
-            else:
-                df = pd.DataFrame({{"content": content.splitlines()}})
-        df.to_excel(out_path, index=False, engine="openpyxl")
-    except Exception as exc:
-        print(f"ERROR:{{exc}}")
-        exit(1)
-
-elif fmt == "json":
-    try:
-        parsed = json.loads(content)
-        with open(out_path, 'w', encoding='utf-8') as f:
-            json.dump(parsed, f, ensure_ascii=False, indent=2)
-    except json.JSONDecodeError:
-        with open(out_path, 'w', encoding='utf-8') as f:
-            f.write(content)
-
-elif fmt in ("csv", "md", "html", "txt", "py"):
-    with open(out_path, 'w', encoding='utf-8') as f:
-        f.write(content)
-else:
-    print(f"UNSUPPORTED:{{fmt}}")
-    exit(1)
-
-print(f"DONE:{{out_path}}")
-"""
-        output = run_ai_code_securely(script_code, data_folder_path=folder_str)
-
-        # Cleanup temp file
-        if temp_input_path.exists():
-            temp_input_path.unlink()
-
-        if "UNSUPPORTED:" in output:
             return json.dumps({
                 "type": "file_export",
                 "error": f"Format '{fmt}' tidak didukung. Gunakan: ipynb, csv, xlsx, json, md, html, txt, py",
             }, ensure_ascii=False)
-        elif "ERROR:" in output:
-            return json.dumps({
-                "type": "file_export",
-                "error": f"Gagal mengekspor file: {output}",
-            }, ensure_ascii=False)
-
-        out_path = exports_folder / f"{fname}.{fmt}"
 
         _push(f"📄 File diekspor: exports/{out_path.name}")
         return json.dumps({
@@ -422,8 +415,9 @@ print(f"DONE:{{out_path}}")
             f"print(json.dumps(result, default=str))\n"
         )
 
-        output = run_ai_code_securely(code, data_folder_path=folder_str)
-        if "Error" in output or "Traceback" in output:
+        status_box: list = []
+        output = run_ai_code_securely(code, data_folder_path=folder_str, status_out=status_box)
+        if (status_box[0] if status_box else "success") == "error":
             return json.dumps({"status": "error", "output": output[:800]}, ensure_ascii=False)
         return output
 
@@ -432,7 +426,7 @@ print(f"DONE:{{out_path}}")
     def bash_tool(command: str, workdir: str = "/app/data") -> str:
         """Jalankan command shell di sandbox. Gunakan untuk: cek file (ls), pindah/rename file (mv), salin (cp), hapus (rm), inspect folder, atau operasi sistem cepat lainnya. JANGAN gunakan untuk analisis data — itu tugas python_repl_tool."""
         import uuid
-        _safe_cmds = {"ls", "dir", "pwd", "whoami", "echo", "cat", "head", "tail", "wc", "stat", "du", "df", "mv", "cp", "rm", "mkdir", "chmod", "file", "sort", "uniq", "cut", "find"}
+        _safe_cmds = {"ls", "dir", "pwd", "whoami", "echo", "cat", "head", "tail", "wc", "stat", "du", "df", "mv", "cp", "mkdir", "file", "sort", "uniq", "cut", "find"}
         cmd_clean = command.strip().split()
         base = cmd_clean[0] if cmd_clean else ""
         if base not in _safe_cmds:
@@ -456,6 +450,23 @@ print(f"DONE:{{out_path}}")
             clean_filename += '.png'
 
         _push(f"📈 Membuat chart: {clean_filename}")
+
+        # ── Guard: one call must produce exactly ONE chart ──────────────────
+        # Multiple figures or multiple savefig calls means the agent batched
+        # several charts; the tool can only save one file (and all savefig
+        # calls would collide on the same filename), so ask it to split.
+        _fig_count = len(re.findall(r"plt\.subplots\s*\(|plt\.figure\s*\(", code))
+        _savefig_count = len(re.findall(r"plt\.savefig\s*\(", code))
+        if _fig_count > 1 or _savefig_count > 1:
+            _push("⚠️ Terdeteksi beberapa chart dalam satu panggilan")
+            return json.dumps({
+                "type": "chart",
+                "error": (
+                    "Satu panggilan render_chart_tool hanya boleh menghasilkan SATU chart, "
+                    "tetapi terdeteksi beberapa figure/chart. Pisahkan menjadi beberapa "
+                    "panggilan render_chart_tool terpisah — satu panggilan untuk satu chart."
+                ),
+            }, ensure_ascii=False)
 
         # ── Auto-inject data loading if the agent forgot to include it ──────
         # Check if the code already contains any file-reading call
@@ -594,7 +605,7 @@ print(f"DONE:{{out_path}}")
                 "filename": clean_filename,
                 "size_bytes": file_size,
             }, ensure_ascii=False)
-        return json.dumps({"type": "chart", "error": f"File chart tidak terbuat. Sandbox output: {output[:400]}"}, ensure_ascii=False)
+        return json.dumps({"type": "chart", "error": f"Chart gagal dibuat karena kode error. Perbaiki kode lalu panggil ulang. Detail: {output[-500:].strip()}"}, ensure_ascii=False)
 
     # ── Data Profile Tool ──────────────────────────────────────────────
     @tool
@@ -655,7 +666,7 @@ print(f"DONE:{{out_path}}")
 
         try:
             output_parts = []
-            for line in stream_ai_code_securely(profile_code, data_folder_path=folder_str):
+            for line in stream_ai_code_securely(profile_code, data_folder_path=folder_str, bypass_validation=True):
                 output_parts.append(line)
                 if line.rstrip():
                     _push(line.rstrip())
@@ -760,9 +771,15 @@ print(f"DONE:{{out_path}}")
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
             }
-            
+
+            # SSRF guard: validate the target before connecting
+            _assert_url_safe(url)
+
             response = _requests.get(url, headers=headers, stream=True, timeout=30)
             response.raise_for_status()
+
+            # Re-validate the final URL after any redirects before reading the body
+            _assert_url_safe(response.url)
             
             if not filename:
                 cd = response.headers.get("Content-Disposition", "")
@@ -788,13 +805,45 @@ print(f"DONE:{{out_path}}")
             filename = Path(filename).name
             if filename in {"_exec_script.py", "_kernel_loop.py", "_schema.json", ".chats.json", "dashboard.json"}:
                 filename = "downloaded_" + filename
-                
+
+            # Enforce a maximum download size to protect host disk
+            from backend.core.config import MAX_UPLOAD_MB
+            max_bytes = MAX_UPLOAD_MB * 1024 * 1024
+            try:
+                declared = int(response.headers.get("Content-Length", "0"))
+            except ValueError:
+                declared = 0
+            if declared and declared > max_bytes:
+                _push(f"❌ File terlalu besar ({declared / 1024 / 1024:.1f} MB > {MAX_UPLOAD_MB} MB)")
+                return json.dumps({
+                    "status": "error",
+                    "output": f"File terlalu besar ({declared / 1024 / 1024:.1f} MB). Batas maksimum {MAX_UPLOAD_MB} MB.",
+                }, ensure_ascii=False)
+
             out_path = data_folder / filename
+            downloaded = 0
+            too_big = False
             with open(out_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-            
+                    if not chunk:
+                        continue
+                    downloaded += len(chunk)
+                    if downloaded > max_bytes:
+                        too_big = True
+                        break
+                    f.write(chunk)
+
+            if too_big:
+                try:
+                    out_path.unlink()
+                except Exception:
+                    pass
+                _push(f"❌ Unduhan dibatalkan: melebihi batas {MAX_UPLOAD_MB} MB")
+                return json.dumps({
+                    "status": "error",
+                    "output": f"Unduhan dibatalkan: file melebihi batas {MAX_UPLOAD_MB} MB.",
+                }, ensure_ascii=False)
+
             file_size = out_path.stat().st_size
             _push(f"✅ Unduhan selesai: {filename} ({file_size:,} bytes)")
             
@@ -815,9 +864,18 @@ print(f"DONE:{{out_path}}")
     # Build tool list
     tool_list = [update_task_list_tool, read_data_tool, python_repl_tool, render_chart_tool, file_export_tool, data_profile_tool, bash_tool, download_dataset_tool]
 
+    kwargs = {
+        "checkpointer": MemorySaver(),
+    }
+    import inspect
+    sig = inspect.signature(create_react_agent)
+    if "prompt" in sig.parameters:
+        kwargs["prompt"] = prompt
+    else:
+        kwargs["messages_modifier"] = prompt
+
     return create_react_agent(
         llm,
         tools=tool_list,
-        messages_modifier=prompt,
-        checkpointer=MemorySaver(),
+        **kwargs
     )

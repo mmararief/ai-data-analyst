@@ -4,6 +4,8 @@ Platform analisis data berbasis AI yang menggunakan **single ReAct agent dengan 
 
 > Proyek Skripsi — Muhammad Ammar Arief
 > *"Pengembangan AI Data Analyst Berbasis Large Language Model untuk Analisis Dataset Otomatis Menggunakan Tool Calling dan Python Sandbox"*
+> 
+> **Live Demo Website:** [http://analisai.my.id/](http://analisai.my.id/)
 
 ## Fitur Utama
 
@@ -109,7 +111,6 @@ User Input → [LLM (SumoPod/Ollama)] → Tool Calling Loop → Response
 | **Redis** | redis:7-alpine |
 | **MinIO** | minio/minio:latest |
 | **Sandbox** | python:3.10-slim (kustom) |
-| **Nginx** | nginx:stable (reverse proxy) |
 
 ## Quick Start
 
@@ -291,7 +292,6 @@ ai-data-analyst/
 ├── docker-compose.yml
 ├── Dockerfile.backend
 ├── Dockerfile.sandbox
-├── nginx-proxy.conf
 ├── tests/
 └── Skripsi/                   # Thesis materials
 ```

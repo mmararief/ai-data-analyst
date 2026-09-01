@@ -73,3 +73,13 @@ def get_current_user(
     if row is None:
         raise credentials_exception
     return UserInDB.model_validate(row)
+
+
+def require_admin(current_user: UserInDB = Depends(get_current_user)) -> UserInDB:
+    if getattr(current_user, "role", "user") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akses ditolak. Fitur ini hanya untuk Administrator.",
+        )
+    return current_user
+

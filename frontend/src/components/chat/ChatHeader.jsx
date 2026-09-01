@@ -1,4 +1,4 @@
-// Top header for the chat page: collapse-burger when sidebar is hidden,
+﻿// Top header for the chat page: collapse-burger when sidebar is hidden,
 // title, status pill, theme toggle, and user avatar.
 
 import { useNavigate } from 'react-router-dom'
@@ -8,6 +8,7 @@ export default function ChatHeader({
   username,
   loading,
   statusText,
+  title,
   sidebarCollapsed,
   onExpandSidebar,
   theme,
@@ -55,10 +56,25 @@ export default function ChatHeader({
         <span style={{
           fontSize: '1.25rem', fontWeight: 500, letterSpacing: '-0.02em',
           color: 'var(--text-secondary)',
-          fontFamily: "'Syne', sans-serif",
+          fontFamily: "'Inter', sans-serif",
         }}>
           Analisai
         </span>
+
+        {title && (
+          <>
+            <span style={{ color: 'var(--border-primary)', fontSize: '1.1rem', userSelect: 'none' }}>/</span>
+            <span style={{
+              fontSize: '0.95rem', fontWeight: 600, letterSpacing: '-0.01em',
+              color: 'var(--text-heading)',
+              fontFamily: "'Inter', sans-serif",
+              maxWidth: 280,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }} title={title}>
+              {title}
+            </span>
+          </>
+        )}
 
         <button
           onClick={() => navigate('/')}
@@ -123,9 +139,9 @@ export default function ChatHeader({
             onClick={onTogglePanel}
             style={{
               height: 30, borderRadius: 7,
-              background: panelVisible ? 'rgba(56,189,248,0.1)' : 'transparent',
-              border: panelVisible ? '1px solid rgba(56,189,248,0.25)' : '1px solid transparent',
-              color: panelVisible ? '#38bdf8' : 'var(--text-muted)',
+              background: panelVisible ? 'rgba(11,87,208,0.1)' : 'transparent',
+              border: panelVisible ? '1px solid rgba(11,87,208,0.25)' : '1px solid transparent',
+              color: panelVisible ? 'var(--analisai-cyan)' : 'var(--text-muted)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem',
               cursor: 'pointer', transition: 'all 0.2s',
               padding: '0 10px',

@@ -38,16 +38,16 @@ export default function ToolCallGroup({ steps, projectId, isLoading, selectedInd
     <div className="my-3 select-none w-full">
       <div
         ref={containerRef}
-        className="flex flex-col gap-1.5 w-full"
+        className="flex flex-col gap-0.5 w-full"
       >
         {deduped.map((step, i) => {
           if (step.type === 'task_start') {
             return (
               <div
                 key={i}
-                className="flex items-center gap-3.5 py-1 px-1 text-[13px] text-[var(--text-secondary)] font-medium select-text"
+                className="flex items-center gap-3 py-1.5 px-2 text-[12.5px] text-[var(--text-secondary)] font-medium select-text"
               >
-                <span className="w-3.5 h-3.5 flex items-center justify-center font-bold text-[var(--text-muted)] select-none text-[16px]">•</span>
+                <span className="w-4 h-4 flex items-center justify-center font-bold text-[var(--text-muted)] select-none text-[16px]">•</span>
                 <span className="truncate">{step.content}</span>
               </div>
             )

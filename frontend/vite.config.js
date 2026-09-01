@@ -31,4 +31,7 @@ export default defineConfig({
       '/streamlit': 'http://localhost:8000',
     },
   },
+  build: {
+    emptyOutDir: false,
+  },
 })

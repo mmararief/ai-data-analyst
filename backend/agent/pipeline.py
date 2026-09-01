@@ -17,14 +17,10 @@ from pathlib import Path
 
 from backend.agent.llm import build_llm, stream_with_retry
 from backend.agent.prompts import (
-    CHART_RULE,
-    CONTEXT_RULE,
-    OUTPUT_DISCIPLINE_RULE,
     build_direct_llm_prompt,
     SINGLE_AGENT_SYSTEM_PROMPT,
 )
 from backend.agent.utils import (
-    build_history_context,
     cleanup_context_files,
     extract_text,
     list_data_contents,

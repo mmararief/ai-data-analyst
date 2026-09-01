@@ -5,6 +5,7 @@ import DataPreviewModal from './DataPreviewModal'
 import DashboardViewer from './chat/DashboardViewer'
 
 const MAX_FILES_PER_UPLOAD = 20
+const MAX_FILE_SIZE_MB = 25
 
 const FILE_COLORS = {
   csv: '#38bdf8', xlsx: '#22c55e', xls: '#22c55e',
@@ -216,6 +217,11 @@ export default function Sidebar({ projectId, sessionId, onSuggest, onLoadHistory
     try {
       for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i]
+        if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+          failedUploads.push(`${file.name}: Ukuran file (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimum ${MAX_FILE_SIZE_MB} MB`)
+          setUploadProgress(prev => ({ ...prev, failed: prev.failed + 1 }))
+          continue
+        }
         const form = new FormData()
         form.append('file', file)
         form.append('batch_total', String(fileList.length))
@@ -291,7 +297,7 @@ export default function Sidebar({ projectId, sessionId, onSuggest, onLoadHistory
       height: '100%',
       background: sidebarBg,
       display: 'flex', flexDirection: 'column',
-      fontFamily: "'Outfit', sans-serif",
+      fontFamily: "'Inter', sans-serif",
       overflow: 'hidden',
       flexShrink: 0,
       borderRight: `1px solid ${borderCol}`,
@@ -349,7 +355,7 @@ export default function Sidebar({ projectId, sessionId, onSuggest, onLoadHistory
             width: '100%', padding: '0.7rem 1rem',
             background: cardBg, border: `1px solid ${borderCol}`,
             borderRadius: 12, cursor: 'pointer',
-            fontFamily: "'Outfit', sans-serif", fontSize: '0.82rem', fontWeight: 600,
+            fontFamily: "'Inter', sans-serif", fontSize: '0.82rem', fontWeight: 600,
             color: textPrimary, transition: 'all 0.2s ease',
             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
           }}
@@ -443,9 +449,42 @@ export default function Sidebar({ projectId, sessionId, onSuggest, onLoadHistory
                       </svg>
                       Tambah Dataset
                     </div>
-                    <span style={{ fontSize: '9px', color: textMuted }}>
-                      Klik atau seret file ke sini
+                    <span style={{ fontSize: '9.5px', color: textMuted, marginTop: '1px' }}>
+                      Klik atau seret berkas ke sini
                     </span>
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '0.2rem',
+                      marginTop: '0.35rem',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: '7.5px',
+                      color: textMuted,
+                      width: '100%',
+                    }}>
+                      <span style={{
+                        padding: '1.5px 6px',
+                        borderRadius: '4px',
+                        background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                        border: `1px solid ${borderCol}`,
+                        textAlign: 'center',
+                        letterSpacing: '0.02em',
+                      }}>
+                        CSV, XLSX, XLS, JSON, PARQUET, PKL
+                      </span>
+                      <span style={{
+                        padding: '1.5px 6px',
+                        borderRadius: '4px',
+                        background: isDark ? 'rgba(56,189,248,0.08)' : 'rgba(11,87,208,0.06)',
+                        color: cyanAccent,
+                        border: `1px solid ${isDark ? 'rgba(56,189,248,0.2)' : 'rgba(11,87,208,0.15)'}`,
+                        fontWeight: 600,
+                        textAlign: 'center',
+                      }}>
+                        Maks. 25 MB / berkas (Hingga 20 berkas)
+                      </span>
+                    </div>
                   </>
                 )}
               </div>
@@ -881,6 +920,26 @@ export default function Sidebar({ projectId, sessionId, onSuggest, onLoadHistory
 
         {/* Action icons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
+          {/* Admin link */}
+          {localStorage.getItem('role') === 'admin' && (
+            <button
+              onClick={() => navigate('/admin')}
+              style={{
+                width: 28, height: 28, borderRadius: 7,
+                background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#ef4444',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', transition: 'all 0.2s ease',
+              }}
+              title="Halaman Admin"
+            >
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          )}
+
           {/* Theme Toggle */}
           <button
             onClick={onToggleTheme}

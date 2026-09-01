@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+﻿import { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useTheme } from '../../ThemeContext'
 import NativeChartRenderer from './NativeChartRenderer'
@@ -10,31 +10,72 @@ import 'ag-grid-community/styles/ag-theme-quartz.css'
 // Register AG Grid Modules
 ModuleRegistry.registerModules([AllCommunityModule])
 
-const buildFilteredQuery = (baseQuery, activeFilters, filtersConfig) => {
+const quoteIdent = (col) => `"${String(col).replace(/"/g, '""')}"`
+
+// Resolve the SQL expression + numeric-ness for a filter, preferring the
+// schema's explicit "column"/"transform" (dataset-agnostic). Falls back to
+// the old hardcoded behavior for legacy dashboards without "column".
+const resolveColumnExpr = (fConfig, filterId, datasetName) => {
+  const col = fConfig?.column
+  if (col) {
+    const ident = quoteIdent(col)
+    const t = (fConfig.transform || '').toLowerCase()
+    if (t === 'year') return { expr: `YEAR(CAST(${ident} AS DATE))`, numeric: true }
+    if (t === 'month') return { expr: `MONTH(CAST(${ident} AS DATE))`, numeric: true }
+    if (t === 'date') return { expr: `CAST(${ident} AS DATE)`, numeric: false }
+    return { expr: ident, numeric: fConfig.dtype === 'number' || fConfig.numeric === true }
+  }
+  // Legacy fallback (dashboards generated before the "column" field existed)
+  if (filterId === 'tahun') return { expr: 'YEAR(CAST(tanggal AS DATE))', numeric: true }
+  if (filterId === 'bulan') return { expr: 'MONTH(CAST(tanggal AS DATE))', numeric: true }
+  if (filterId === 'kategori' && datasetName && datasetName.toLowerCase().includes('ispu')) {
+    return { expr: 'categori', numeric: false }
+  }
+  return { expr: quoteIdent(filterId), numeric: false }
+}
+
+const buildFilteredQuery = (baseQuery, activeFilters, config) => {
   if (!baseQuery) return ''
-  
+  const filtersConfig = config?.filters
+  const datasetName = config?.dataset_name
+
+  // Remove trailing semicolon to allow wrapping in subquery
+  const cleanBaseQuery = baseQuery.trim().replace(/;+$/, '')
+
   const conditions = []
   Object.entries(activeFilters).forEach(([filterId, activeVal]) => {
     const fConfig = filtersConfig?.find(f => f.id === filterId)
     if (!fConfig) return
-    
+
+    const { expr, numeric } = resolveColumnExpr(fConfig, filterId, datasetName)
+
     if (fConfig.type === 'search') {
-      if (activeVal && activeVal.trim() !== '') {
-        const safeVal = activeVal.replace(/'/g, "''")
-        conditions.push(`LOWER(${filterId}) LIKE '%${safeVal.toLowerCase()}%'`)
+      if (activeVal && String(activeVal).trim() !== '') {
+        const safeVal = String(activeVal).replace(/'/g, "''")
+        conditions.push(`LOWER(CAST(${expr} AS VARCHAR)) LIKE '%${safeVal.toLowerCase()}%'`)
       }
     } else {
-      if (activeVal !== 'Semua' && activeVal !== '') {
-        const safeVal = activeVal.replace(/'/g, "''")
-        conditions.push(`${filterId} = '${safeVal}'`)
+      if (activeVal !== 'Semua' && activeVal !== '' && activeVal != null) {
+        if (numeric && !isNaN(Number(activeVal))) {
+          conditions.push(`${expr} = ${Number(activeVal)}`)
+        } else {
+          const safeVal = String(activeVal).replace(/'/g, "''")
+          conditions.push(`${expr} = '${safeVal}'`)
+        }
       }
     }
   })
-  
-  if (conditions.length === 0) return baseQuery
-  
+
+  if (conditions.length === 0) return cleanBaseQuery
+
   const whereClause = conditions.join(' AND ')
-  return `SELECT * FROM (${baseQuery}) AS subquery WHERE ${whereClause}`
+
+  const datasetRegex = /\bdataset\b/gi
+  if (datasetRegex.test(cleanBaseQuery)) {
+    return cleanBaseQuery.replace(datasetRegex, `(SELECT * FROM dataset WHERE ${whereClause})`)
+  }
+
+  return `SELECT * FROM (${cleanBaseQuery}) AS subquery WHERE ${whereClause}`
 }
 
 export default function DashboardViewer({ projectId, filename, onClose }) {
@@ -128,7 +169,7 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
     const token = localStorage.getItem('token')
     
     // Wrap base query with current filter values
-    const queryToRun = buildFilteredQuery(baseQuery, activeFilters, config?.filters)
+    const queryToRun = buildFilteredQuery(baseQuery, activeFilters, config)
     
     try {
       const response = await fetch(`/datasets/${projectId}/query`, {
@@ -205,6 +246,27 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
       }))
     }
   }
+
+  // Reset all filters back to their defaults
+  const resetFilters = () => {
+    const initialFilters = {}
+    const initialSearch = {}
+    ;(config?.filters || []).forEach((f) => {
+      if (f.type === 'search') {
+        initialFilters[f.id] = f.default || ''
+        initialSearch[f.id] = f.default || ''
+      } else {
+        initialFilters[f.id] = f.default || 'Semua'
+      }
+    })
+    setActiveFilters(initialFilters)
+    setSearchInputs(initialSearch)
+  }
+
+  // Whether any filter currently deviates from its default ("Semua"/empty)
+  const hasActiveFilters = Object.entries(activeFilters).some(
+    ([, v]) => v !== 'Semua' && v !== '' && v != null
+  )
 
   // Dynamic charts with overridden types
   const [chartTypes, setChartTypes] = useState({})
@@ -286,7 +348,7 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
       exit={{ opacity: 0 }}
       className="absolute inset-0 z-[100] flex flex-col overflow-y-auto"
       style={{
-        fontFamily: "'Outfit', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         background: isDark ? '#0f0f11' : '#f8fafc',
         color: textPrimary
       }}
@@ -418,7 +480,7 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
                       fontWeight: 700,
                       letterSpacing: '0.05em',
                       textTransform: 'uppercase',
-                      fontFamily: "'Outfit', sans-serif"
+                      fontFamily: "'Inter', sans-serif"
                     }}>
                       {m.label}
                     </span>
@@ -501,7 +563,7 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
                     fontWeight: 700,
                     color: textMuted,
                     letterSpacing: '0.05em',
-                    fontFamily: "'Outfit', sans-serif"
+                    fontFamily: "'Inter', sans-serif"
                   }}>
                     {f.label}
                   </label>
@@ -551,6 +613,34 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
                   )}
                 </div>
               ))}
+
+              {hasActiveFilters && (
+                <button
+                  onClick={resetFilters}
+                  style={{
+                    alignSelf: 'flex-end',
+                    padding: '0.4rem 0.9rem',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    borderRadius: '10px',
+                    background: hoverBg,
+                    border: `1px solid ${borderCol}`,
+                    color: textSecondary,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                  className="filter-select-hover"
+                  title="Reset semua filter"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Reset
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -583,7 +673,7 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
                       fontSize: '0.82rem',
                       fontWeight: 700,
                       color: textPrimary,
-                      fontFamily: "'Outfit', sans-serif"
+                      fontFamily: "'Inter', sans-serif"
                     }}>
                       {c.title}
                     </h3>
@@ -638,8 +728,6 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
                       <NativeChartRenderer
                         type={chartType}
                         data={filteredData}
-                        xKey={c.xKey}
-                        yKeys={c.yKeys}
                         mapping={c.mapping}
                         title={c.title}
                         isDark={isDark}
@@ -717,7 +805,7 @@ export default function DashboardViewer({ projectId, filename, onClose }) {
                         fontSize: '0.82rem',
                         fontWeight: 700,
                         color: textPrimary,
-                        fontFamily: "'Outfit', sans-serif"
+                        fontFamily: "'Inter', sans-serif"
                       }}>
                         {t.title}
                       </h3>

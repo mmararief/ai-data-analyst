@@ -1,36 +1,35 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import PartRenderer from './chat/PartRenderer'
 import ToolCallGroup from './chat/ToolCallGroup'
 
-async function generateAndDownloadNotebook(allMessages) {
-  const token = localStorage.getItem('token')
-  const payload = allMessages.map(m => ({
-    role: m.role,
-    content: m.content || '',
-    parts: m.parts || [],
-    codeSteps: (m.codeSteps || []).map(s => ({ code: s.code || '', output: s.output || '' })),
-    images: m.images || [],
-  }))
-  const res = await fetch('/notebook/generate', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ messages: payload }),
-  })
-  if (!res.ok) throw new Error('Gagal generate notebook')
-  const notebook = await res.json()
-  const blob = new Blob([JSON.stringify(notebook, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `analisis_${Date.now()}.ipynb`
-  a.click()
-  URL.revokeObjectURL(url)
+function formatExecutionTime(seconds) {
+  if (seconds === null || seconds === undefined) return null
+  const s = typeof seconds === 'string' ? parseFloat(seconds) : seconds
+  if (isNaN(s)) return null
+  if (s < 60) {
+    return `${s.toFixed(1)}s`
+  }
+  const mins = Math.floor(s / 60)
+  const secs = (s % 60).toFixed(1)
+  return `${mins}m ${secs}s`
 }
 
-function TypingIndicator() {
+function LiveTimer({ startTime }) {
+  const [elapsed, setElapsed] = useState(0)
+
+  useEffect(() => {
+    if (!startTime) return
+    const update = () => setElapsed((Date.now() - startTime) / 1000)
+    update()
+    const interval = setInterval(update, 100)
+    return () => clearInterval(interval)
+  }, [startTime])
+
+  if (!startTime) return null
+  return <span className="font-mono text-[10px] opacity-75">({elapsed.toFixed(1)}s)</span>
+}
+
+function TypingIndicator({ startTime }) {
   return (
     <div className="flex items-center gap-3 py-2">
       <div className="flex gap-1.5">
@@ -38,7 +37,9 @@ function TypingIndicator() {
         <span className="typing-dot" />
         <span className="typing-dot" />
       </div>
-      <span className="text-xs text-[var(--text-muted)]">Berfikir...</span>
+      <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+        Berfikir... <LiveTimer startTime={startTime} />
+      </span>
     </div>
   )
 }
@@ -177,7 +178,7 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
               )}
 
               {isEmpty ? (
-                <TypingIndicator />
+                <TypingIndicator startTime={message.startTime} />
               ) : (
                 <>
                   {ordered.map((item, i) =>
@@ -214,11 +215,20 @@ export default function MessageBubble({ message, isLoading, statusText, allMessa
                         <span className="typing-dot" style={{ width: 4, height: 4 }} />
                         <span className="typing-dot" style={{ width: 4, height: 4 }} />
                       </div>
-                      <span className="text-[11px] text-[var(--text-muted)] italic">{statusText || 'Memproses...'}</span>
+                      <span className="text-[11px] text-[var(--text-muted)] italic flex items-center gap-1">
+                        {statusText || 'Memproses...'} <LiveTimer startTime={message.startTime} />
+                      </span>
                     </div>
                   )}
 
-
+                  {!isLoading && message.executionTime != null && (
+                    <div className="flex items-center gap-1.5 pt-2 text-[11px] text-[var(--text-muted)] select-none opacity-70 hover:opacity-100 transition-opacity">
+                      <svg className="w-3.5 h-3.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <span>Waktu respon: {formatExecutionTime(message.executionTime)}</span>
+                    </div>
+                  )}
                 </>
               )}
             </div>

@@ -9,11 +9,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    from backend.core.config import SANDBOX_TIMEOUT, SANDBOX_MEM_LIMIT, SANDBOX_CPU_QUOTA
+    from backend.core.config import SANDBOX_TIMEOUT, SANDBOX_MEM_LIMIT, SANDBOX_CPU_QUOTA, TEMP_ROOT
 except ImportError:
     SANDBOX_TIMEOUT = 120
     SANDBOX_MEM_LIMIT = "512m"
     SANDBOX_CPU_QUOTA = 100000
+    TEMP_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "temp")
 
 _ALLOWED_IMPORTS = {
     "pandas", "numpy", "matplotlib", "seaborn", "plotly",
@@ -98,9 +99,14 @@ def main():
             try:
                 with contextlib.redirect_stdout(stdout_cap), contextlib.redirect_stderr(stderr_cap):
                     exec(code, global_ctx)
-            except Exception:
-                stderr_cap.write(traceback.format_exc())
-                status = "error"
+            except BaseException as e:
+                if isinstance(e, SystemExit):
+                    if e.code and e.code != 0:
+                        stderr_cap.write(f"SystemExit: {e.code}\\n")
+                        status = "error"
+                else:
+                    stderr_cap.write(traceback.format_exc())
+                    status = "error"
                 
             res = {
                 "status": status,
@@ -126,7 +132,14 @@ def _ensure_sandbox_started(data_folder_path: str):
     absolute_data_path = os.path.abspath(data_folder_path)
     os.makedirs(absolute_data_path, exist_ok=True)
     if absolute_data_path in _active_containers:
-        return _active_containers[absolute_data_path]
+        container = _active_containers[absolute_data_path]
+        try:
+            container.reload()
+            if container.status == "running":
+                return container
+        except Exception:
+            pass
+        _active_containers.pop(absolute_data_path, None)
         
     client = docker.from_env()
     
@@ -144,6 +157,22 @@ def _ensure_sandbox_started(data_folder_path: str):
     except Exception:
         pass
         
+    # Resolve host bind path for Docker-in-Docker / Docker-sibling volume mounting
+    host_temp_dir = os.environ.get("HOST_TEMP_DIR") or os.environ.get("HOST_PROJECT_DIR")
+    if host_temp_dir:
+        norm_data = os.path.normpath(absolute_data_path)
+        norm_temp = os.path.normpath(str(TEMP_ROOT))
+        if norm_data.startswith(norm_temp):
+            rel = os.path.relpath(norm_data, norm_temp)
+            if host_temp_dir.rstrip("/\\").endswith("temp"):
+                bind_path = os.path.join(host_temp_dir, rel)
+            else:
+                bind_path = os.path.join(host_temp_dir, "temp", rel)
+        else:
+            bind_path = absolute_data_path
+    else:
+        bind_path = absolute_data_path
+
     container = client.containers.run(
         image="ai-sandbox:latest",
         name=container_name,
@@ -151,7 +180,7 @@ def _ensure_sandbox_started(data_folder_path: str):
         network_disabled=True,
         mem_limit=SANDBOX_MEM_LIMIT,
         cpu_quota=SANDBOX_CPU_QUOTA,
-        volumes={absolute_data_path: {"bind": "/app/data", "mode": "rw"}},
+        volumes={bind_path: {"bind": "/app/data", "mode": "rw"}},
         working_dir="/app",
         detach=True,
         auto_remove=True,  # Docker will automatically clean it up when process exits
@@ -194,14 +223,26 @@ def cleanup_all_sandboxes():
         logger.warning(f"Gagal membersihkan orphan sandboxes: {e}")
 
 
-def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str):
+def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypass_validation: bool = False, status_out: list | None = None):
+    """Stream sandbox stdout/stderr.
+
+    If ``status_out`` (a list) is provided, the real execution status reported
+    by the sandbox kernel ("success" | "error") is appended to it. This lets
+    callers detect failures reliably instead of guessing from the output text.
+    """
+    def _set_status(value: str) -> None:
+        if status_out is not None:
+            status_out.append(value)
+
     absolute_data_path = os.path.abspath(data_folder_path)
     lock = _get_lock(absolute_data_path)
     
-    validation_error = _validate_code(ai_generated_code)
-    if validation_error:
-        yield f"\nError: {validation_error}\n"
-        return
+    if not bypass_validation:
+        validation_error = _validate_code(ai_generated_code)
+        if validation_error:
+            _set_status("error")
+            yield f"\nError: {validation_error}\n"
+            return
 
     with lock:
         try:
@@ -225,6 +266,7 @@ def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str):
             
             while True:
                 if time.time() - start_time > timeout:
+                    _set_status("error")
                     yield f"\nError: Timeout — kode memakan waktu lebih dari {timeout} detik.\n"
                     break
                     
@@ -233,6 +275,9 @@ def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str):
                         with open(res_file, "r", encoding="utf-8") as f:
                             res = json.load(f)
                         
+                        # Surface the kernel's real exec status (set on exception)
+                        _set_status(res.get("status", "success"))
+
                         if res.get("stdout"):
                             yield res["stdout"]
                         if res.get("stderr"):
@@ -246,10 +291,11 @@ def stream_ai_code_securely(ai_generated_code: str, data_folder_path: str):
                 time.sleep(0.1)
                 
         except Exception as e:
+            _set_status("error")
             yield f"Sistem Sandbox gagal: {str(e)}\n"
 
-def run_ai_code_securely(ai_generated_code: str, data_folder_path: str) -> str:
-    return "".join(stream_ai_code_securely(ai_generated_code, data_folder_path))
+def run_ai_code_securely(ai_generated_code: str, data_folder_path: str, bypass_validation: bool = False, status_out: list | None = None) -> str:
+    return "".join(stream_ai_code_securely(ai_generated_code, data_folder_path, bypass_validation=bypass_validation, status_out=status_out))
 
 def run_bash_in_sandbox(command: str, data_folder_path: str) -> str:
     absolute_data_path = os.path.abspath(data_folder_path)
@@ -260,7 +306,14 @@ def run_bash_in_sandbox(command: str, data_folder_path: str) -> str:
             res = container.exec_run(["bash", "-c", command], workdir="/app/data")
             return res.output.decode("utf-8", errors="replace")
         except Exception as e:
-            return f"Bash execution failed: {str(e)}"
+            # If execution failed due to stale container, clear and retry once
+            _active_containers.pop(absolute_data_path, None)
+            try:
+                container = _ensure_sandbox_started(absolute_data_path)
+                res = container.exec_run(["bash", "-c", command], workdir="/app/data")
+                return res.output.decode("utf-8", errors="replace")
+            except Exception as retry_exc:
+                return f"Bash execution failed: {str(retry_exc)}"
 
 if __name__ == "__main__":
     test_code = "import os\nx = 5\nprint('Hello Stateful Sandbox!')"

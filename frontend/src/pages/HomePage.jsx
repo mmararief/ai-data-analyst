@@ -3,6 +3,23 @@ import Logo from '../components/Logo'
 import TerminalMockup from '../components/TerminalMockup'
 import ModelLeaderboard from '../components/ModelLeaderboard'
 
+// Distinct, on-brand icon per feature (avoids the repeated-bolt look)
+const featureIcons = {
+  code: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 18l6-6-6-6M8 6l-6 6 6 6" />,
+  sandbox: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />,
+  chart: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 3v18h18M8 17V9m4 8V6m4 11v-4" />,
+  stream: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 12h4l3 8 4-16 3 8h4" />,
+  storage: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7c0 1.657-3.582 3-8 3S4 8.657 4 7m16 0c0-1.657-3.582-3-8-3S4 5.343 4 7m16 0v10c0 1.657-3.582 3-8 3s-8-1.343-8-3V7" />,
+  dashboard: (
+    <>
+      <rect x="4" y="4" width="7" height="7" rx="1.2" strokeWidth="1.5" />
+      <rect x="13" y="4" width="7" height="4" rx="1.2" strokeWidth="1.5" />
+      <rect x="13" y="11" width="7" height="9" rx="1.2" strokeWidth="1.5" />
+      <rect x="4" y="14" width="7" height="6" rx="1.2" strokeWidth="1.5" />
+    </>
+  ),
+}
+
 function RevealSection({ children, className = '', delay = 0 }) {
   return (
     <motion.div
@@ -77,7 +94,7 @@ export default function HomePage({ onStart }) {
           <button 
             onClick={onStart}
             style={{ background: 'var(--analisai-cyan)', color: 'white' }}
-            className="px-5 py-2.5 rounded-lg text-[13px] font-semibold hover:opacity-90 transition-all duration-200"
+            className="px-5 py-2.5 rounded-lg text-[13px] font-semibold hover:opacity-90 active:scale-[0.98] transition-all duration-200"
           >
             Mulai Gratis
           </button>
@@ -121,7 +138,7 @@ export default function HomePage({ onStart }) {
           <button 
             onClick={onStart}
             style={{ background: 'var(--analisai-cyan)', color: 'white' }}
-            className="h-[52px] px-8 rounded-xl font-bold text-[15px] flex items-center gap-2 hover:opacity-90 transition-colors"
+            className="h-[52px] px-8 rounded-xl font-bold text-[15px] flex items-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all duration-200"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             Mulai Analisis
@@ -129,7 +146,7 @@ export default function HomePage({ onStart }) {
           <button 
             onClick={() => document.getElementById('how')?.scrollIntoView({ behavior: 'smooth' })}
             style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}
-            className="h-[52px] px-8 rounded-xl font-semibold text-[15px] flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="h-[52px] px-8 rounded-xl font-semibold text-[15px] flex items-center gap-2 hover:[border-color:var(--analisai-cyan)] hover:[color:var(--text-heading)] active:scale-[0.98] transition-all duration-200"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             Lihat Demo
@@ -206,17 +223,17 @@ export default function HomePage({ onStart }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 rounded-3xl overflow-hidden gap-px" style={{ background: 'var(--border-primary)', border: '1px solid var(--border-primary)' }}>
             {[
-              { icon: 'code', title: 'Eksekusi Kode Otomatis', desc: 'AI akan menulis kode Python secara real-time berdasarkan permintaan Anda untuk mengolah dan menganalisis dataset.' },
-              { icon: 'shield', title: 'Sandbox Docker Terisolasi', desc: 'Seluruh eksekusi kode berjalan aman dalam container Docker offline. Data Anda tidak pernah terekspos.' },
-              { icon: 'chart', title: 'Visualisasi Interaktif', desc: 'Grafik distribusi, korelasi, dan chart lainnya langsung di-render secara visual ke layar Anda menggunakan pustaka matplotlib/seaborn.' },
-              { icon: 'sync', title: 'Streaming Background', desc: 'Proses AI dan eksekusi kode di-stream secara real-time layaknya terminal sungguhan ke browser Anda.' },
-              { icon: 'storage', title: 'Mendukung Multi-format', desc: 'Unggah file data dengan mudah: dukung format CSV, Excel, JSON. Semua file tersimpan dengan aman untuk analisis lanjutan.' },
-              { icon: 'dashboard', title: 'Dashboard & Klarifikasi Interaktif', desc: 'Sajikan hasil temuan Anda dalam dashboard interaktif (dashboard.json) dan konfirmasi dataset via kartu klarifikasi khusus.' },
+              { icon: 'code', title: 'Eksekusi kode otomatis', desc: 'AI akan menulis kode Python secara real-time berdasarkan permintaan Anda untuk mengolah dan menganalisis dataset.' },
+              { icon: 'sandbox', title: 'Sandbox Docker terisolasi', desc: 'Seluruh eksekusi kode berjalan aman dalam container Docker offline. Data Anda tidak pernah terekspos.' },
+              { icon: 'chart', title: 'Visualisasi interaktif', desc: 'Grafik distribusi, korelasi, dan chart lainnya langsung di-render secara visual ke layar Anda menggunakan pustaka matplotlib/seaborn.' },
+              { icon: 'stream', title: 'Streaming background', desc: 'Proses AI dan eksekusi kode di-stream secara real-time layaknya terminal sungguhan ke browser Anda.' },
+              { icon: 'storage', title: 'Mendukung multi-format', desc: 'Unggah file data dengan mudah: dukung format CSV, Excel, JSON. Semua file tersimpan dengan aman untuk analisis lanjutan.' },
+              { icon: 'dashboard', title: 'Dashboard & klarifikasi interaktif', desc: 'Sajikan hasil temuan Anda dalam dashboard interaktif (dashboard.json) dan konfirmasi dataset via kartu klarifikasi khusus.' },
             ].map((f, i) => (
               <div key={i} className="group relative p-10 transition-colors duration-200" style={{ background: 'var(--bg-card)' }}>
                 <div className="font-mono text-[10px] tracking-widest mb-6" style={{ color: 'var(--text-muted)' }}>0{i+1} ——</div>
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-6" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-primary)', color: 'var(--analisai-cyan)' }}>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-6 transition-transform duration-300 group-hover:-translate-y-0.5" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-primary)', color: 'var(--analisai-cyan)' }}>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">{featureIcons[f.icon]}</svg>
                 </div>
                 <h3 className="text-[1.1rem] font-bold mb-3 tracking-tight" style={{ color: 'var(--text-heading)' }}>{f.title}</h3>
                 <p className="text-[0.88rem] leading-[1.7]" style={{ color: 'var(--text-secondary)' }}>{f.desc}</p>
@@ -377,7 +394,7 @@ export default function HomePage({ onStart }) {
             <div className="flex flex-wrap gap-4 justify-center">
               <button 
                 onClick={onStart}
-                className="h-[52px] px-8 rounded-xl font-bold text-[15px] flex items-center gap-2 hover:opacity-90 transition-colors"
+                className="h-[52px] px-8 rounded-xl font-bold text-[15px] flex items-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all duration-200"
                 style={{ background: 'var(--analisai-cyan)', color: 'white' }}
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -397,7 +414,7 @@ export default function HomePage({ onStart }) {
             <span className="hidden md:block">·</span>
             <span className="hidden md:block">Dibuat oleh Muhammad Ammar Arief</span>
           </div>
-          <div className="font-mono tracking-widest uppercase text-[11px]">© 2025 · ALL RIGHTS RESERVED</div>
+          <div className="font-mono tracking-widest uppercase text-[11px] tabular-nums">© {new Date().getFullYear()} · All rights reserved</div>
         </div>
       </footer>
     </div>

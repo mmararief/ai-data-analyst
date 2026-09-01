@@ -47,7 +47,7 @@ function formatStepLabel(step) {
   if (tool === 'read_data_tool') {
     const match = code.match(/read_data_tool\(['"]([^'"]+)['"]/);
     const fname = match ? match[1] : (step.filename || 'dataset')
-    return `Read ${fname}`
+    return `Membaca ${fname}`
   }
   if (tool === 'download_dataset_tool') {
     const matchFname = code.match(/filename=['"]([^'"]+)['"]/);
@@ -56,23 +56,32 @@ function formatStepLabel(step) {
     const url = matchUrl && matchUrl[1] ? matchUrl[1] : '';
     return fname ? `Download ${fname}` : (url ? `Download dari internet` : 'Download dataset');
   }
+  if (tool === 'file_export_tool') {
+    return 'Mengekspor Berkas Hasil'
+  }
   if (tool === 'bash_tool') {
     if (code.includes('head')) {
-      return 'Execute Terminal | Preview CSV file structure'
+      return 'Terminal | Pratinjau Struktur CSV'
     }
     if (code.includes('todo') || code.includes('TODO')) {
-      return 'Write Todo'
+      return 'Menulis Rencana Tugas'
     }
     const cleanCmd = code.replace(/^\$\s*/, '').trim()
-    return `Execute Terminal | ${cleanCmd.slice(0, 30)}`
+    return `Terminal | ${cleanCmd.slice(0, 30)}`
   }
   if (tool === 'render_chart_tool') {
-    return 'Membuat Chart'
+    return 'Membuat Chart Visualisasi'
   }
   if (tool === 'data_profile_tool') {
     return 'Profiling Dataset'
   }
-  return 'Execute Python code'
+  if (code.includes('DataFrame') || code.includes('pd.read_') || code.includes('data =') || code.includes('df[')) {
+    return 'Eksekusi Kode Python | Memproses Data'
+  }
+  if (code.includes('plt.') || code.includes('sns.') || code.includes('fig')) {
+    return 'Eksekusi Kode Python | Render Visualisasi'
+  }
+  return 'Eksekusi Kode Python'
 }
 
 function getStepIcon(step, label) {
@@ -99,13 +108,13 @@ export default function ToolCallStep({ step, index, isRunning, isSelected, onSel
   return (
     <button
       onClick={() => onSelect(index)}
-      className={`group flex items-center gap-3.5 w-full text-left py-2.5 px-3.5 rounded-xl transition-all border shadow-sm cursor-pointer ${
-        isSelected 
-          ? 'bg-[var(--bg-hover)] border-[var(--text-accent)] text-[var(--text-primary)] font-semibold shadow-md' 
-          : 'bg-[var(--bg-secondary)] border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] hover:border-[var(--border-primary)]'
+      className={`group flex items-center gap-3 w-full text-left py-1.5 px-2 rounded-lg transition-colors cursor-pointer border border-transparent ${
+        isSelected
+          ? 'bg-[var(--bg-hover)] text-[var(--text-primary)] font-medium'
+          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
       }`}
     >
-      <div className={`w-4.5 h-4.5 shrink-0 flex items-center justify-center ${color}`}>
+      <div className={`w-4 h-4 shrink-0 flex items-center justify-center ${color}`}>
         {isRunning ? <SpinIcon /> : icon}
       </div>
 
@@ -115,7 +124,7 @@ export default function ToolCallStep({ step, index, isRunning, isSelected, onSel
         </span>
       </div>
 
-      <span className="text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors shrink-0">
+      <span className="text-[var(--text-muted)] opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
         </svg>

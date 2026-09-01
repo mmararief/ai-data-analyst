@@ -25,7 +25,7 @@ export default function ChatPage({ username, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(272)
-  const [, setProjectName] = useState('') // currently unused in UI but fetched for future header use
+  const [projectName, setProjectName] = useState('')
   const [panelVisible, setPanelVisible] = useState(false)
   const [panelManuallyHidden, setPanelManuallyHidden] = useState(false)
   const [selectedStepIndex, setSelectedStepIndex] = useState(-1)
@@ -145,9 +145,7 @@ export default function ChatPage({ username, onLogout }) {
   const hasPanelContent = useMemo(() => {
     if (!lastAssistantMsg) return false
     const parts = lastAssistantMsg.parts || []
-    return parts.some(p =>
-      p.type === 'code_step' || p.type === 'task_start' || p.type === 'agent_label'
-    )
+    return parts.some(p => p.type === 'code_step')
   }, [lastAssistantMsg])
 
   // Auto-show panel and select latest step when AI starts producing tool calls.
@@ -227,11 +225,12 @@ export default function ChatPage({ username, onLogout }) {
         @keyframes slideInLeft { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
         .chat-scroll::-webkit-scrollbar { width: 3px; }
         .chat-scroll::-webkit-scrollbar-track { background: transparent; }
-        .chat-scroll::-webkit-scrollbar-thumb { background: rgba(56,189,248,0.1); border-radius: 2px; }
-        .quick-card:hover { border-color: rgba(56,189,248,0.3) !important; background: rgba(255,255,255,0.04) !important; transform: translateY(-2px); }
-        .scroll-to-bottom:hover { border-color: rgba(56,189,248,0.4) !important; color: #38bdf8 !important; }
-        .header-btn:hover { border-color: rgba(56,189,248,0.3) !important; color: #7dd3fc !important; }
+        .chat-scroll::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 2px; }
+        .quick-card:hover { border-color: var(--analisai-cyan) !important; background: var(--bg-hover) !important; transform: translateY(-2px); }
+        .scroll-to-bottom:hover { border-color: var(--analisai-cyan) !important; color: var(--analisai-cyan) !important; }
+        .header-btn:hover { border-color: var(--analisai-cyan) !important; color: var(--analisai-cyan) !important; }
         .send-btn:hover:not(:disabled) { transform: translateY(-1px); }
+        .send-btn:active:not(:disabled) { transform: scale(0.94); }
       `}</style>
 
       <div style={{
@@ -337,6 +336,7 @@ export default function ChatPage({ username, onLogout }) {
             <ChatHeader
               loading={loading}
               statusText={statusText}
+              title={projectName}
               sidebarCollapsed={sidebarCollapsed}
               onExpandSidebar={() => setSidebarCollapsed(false)}
               panelVisible={panelVisible}

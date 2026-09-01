@@ -5,7 +5,7 @@ const profileStats = [
   { label: 'Missing Values', value: '0.2%', weight: 5, color: 'bg-emerald-500' },
   { label: 'Duplicate Rows', value: '0%', weight: 0, color: 'bg-emerald-500' },
   { label: 'Numeric Columns', value: '12', weight: 60, color: 'bg-sky-500' },
-  { label: 'Categorical Columns', value: '4', weight: 20, color: 'bg-purple-500' },
+  { label: 'Categorical Columns', value: '4', weight: 20, color: 'bg-amber-400' },
 ]
 
 export default function ModelLeaderboard() {

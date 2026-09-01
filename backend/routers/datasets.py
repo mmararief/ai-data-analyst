@@ -1,6 +1,8 @@
 import io
 import json
+import logging
 import re
+import threading
 import time
 from pathlib import Path
 from posixpath import normpath
@@ -17,11 +19,60 @@ from backend.core.minio_store import (
 )
 from backend.core.config import MAX_UPLOAD_MB, MAX_UPLOAD_FILES
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
 ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".json", ".parquet", ".pkl"}
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 SCHEMA_FILENAME = "_schema.json"
+
+# ── Dashboard query engine settings ──────────────────────────────────────
+# Hard cap on rows returned to the browser per widget query (safety net for
+# chart queries that forget to aggregate).
+MAX_QUERY_ROWS = 5000
+
+# Short-lived in-process cache of loaded DataFrames so a dashboard with many
+# widgets (and frequent filter changes) doesn't re-download + re-parse the
+# whole dataset from object storage on every single query.
+_DF_CACHE: dict[tuple, tuple] = {}
+_DF_CACHE_LOCK = threading.Lock()
+_DF_CACHE_TTL = 60  # seconds
+_DF_CACHE_MAX = 16
+
+
+def _load_dataset_df(user_id: str, project_id: str, rel_path: str, ext: str) -> pd.DataFrame:
+    """Load a dataset into a DataFrame, using a short TTL cache."""
+    key = (user_id, project_id, rel_path)
+    now = time.time()
+    with _DF_CACHE_LOCK:
+        cached = _DF_CACHE.get(key)
+        if cached and (now - cached[1]) < _DF_CACHE_TTL:
+            return cached[0]
+
+    data_bytes = get_object_bytes(user_id, rel_path, project_id=project_id)
+    buf = io.BytesIO(data_bytes)
+    if ext == ".csv":
+        df = pd.read_csv(buf)
+    elif ext in (".xlsx", ".xls"):
+        df = pd.read_excel(buf)
+    elif ext == ".json":
+        df = pd.read_json(buf)
+    elif ext == ".parquet":
+        df = pd.read_parquet(buf)
+    else:
+        raise HTTPException(400, f"Format tidak didukung: {ext}")
+
+    with _DF_CACHE_LOCK:
+        # Opportunistic prune of expired/oversized cache
+        if len(_DF_CACHE) >= _DF_CACHE_MAX:
+            stale = [k for k, (_, ts) in _DF_CACHE.items() if (now - ts) >= _DF_CACHE_TTL]
+            for k in stale:
+                _DF_CACHE.pop(k, None)
+            if len(_DF_CACHE) >= _DF_CACHE_MAX:
+                _DF_CACHE.clear()
+        _DF_CACHE[key] = (df, now)
+    return df
 
 
 def _validate_name(filename: str) -> None:
@@ -259,37 +310,42 @@ def query_dataset(
     rel_path = _normalize_relative_path(dataset_name)
     if not rel_path or not object_exists(user.user_id, rel_path, project_id=project_id):
         raise HTTPException(404, f"Dataset {dataset_name} tidak ditemukan")
-        
+
     ext = Path(rel_path).suffix.lower()
+    df = _load_dataset_df(user.user_id, project_id, rel_path, ext)
+
+    # Normalize backtick-quoted identifiers to DuckDB double quotes
+    query = re.sub(r'`([^`]+)`', r'"\1"', query)
+    # Cap result size: wrap the (SELECT) query in an outer LIMIT as a safety net
+    clean_q = query.strip().rstrip(";").strip()
+    capped_query = f"SELECT * FROM ({clean_q}) AS _capped LIMIT {MAX_QUERY_ROWS}"
+
+    import duckdb
+    con = None
     try:
-        data_bytes = get_object_bytes(user.user_id, rel_path, project_id=project_id)
-        buf = io.BytesIO(data_bytes)
-        if ext == ".csv":
-            df = pd.read_csv(buf)
-        elif ext in (".xlsx", ".xls"):
-            df = pd.read_excel(buf)
-        elif ext == ".json":
-            df = pd.read_json(buf)
-        elif ext == ".parquet":
-            df = pd.read_parquet(buf)
-        else:
-            raise HTTPException(400, f"Format tidak didukung: {ext}")
-            
-        query = re.sub(r'`([^`]+)`', r'"\1"', query)
-
-        import duckdb
-        con = duckdb.connect()
+        # Lock down the engine: no filesystem/network/extension access, so a
+        # crafted query can only touch the registered in-memory `dataset`.
+        con = duckdb.connect(config={"enable_external_access": False})
         con.register("dataset", df)
+        res_df = con.execute(capped_query).df()
 
-        res_df = con.execute(query).df()
-        
         # Clean NaN/Inf values so they are JSON-serializable
         res_df = res_df.fillna("")
-        
+
         return {
             "columns": res_df.columns.tolist(),
             "data": res_df.astype(str).values.tolist(),
-            "total_rows": len(res_df)
+            "total_rows": len(res_df),
         }
     except Exception as e:
-        raise HTTPException(400, f"Gagal mengeksekusi query: {str(e)}")
+        logger.warning(
+            "query_dataset failed (project=%s, dataset=%s): %s",
+            project_id, dataset_name, e,
+        )
+        raise HTTPException(400, f"Gagal mengeksekusi query: {str(e)[:300]}")
+    finally:
+        if con is not None:
+            try:
+                con.close()
+            except Exception:
+                pass

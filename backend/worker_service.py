@@ -107,6 +107,9 @@ def process_job(payload: dict) -> None:
         logger.info(f"💾 Auto-saving session history...")
         _auto_save_session(user_id, project_id, session_id, question, history, acc_events)
 
+        # Record token usage for this job
+        _record_job_token_usage(user_id, job_id, project_id, question, history, acc_events)
+
         if is_cancelled:
             logger.info(f"🛑 Job {job_id} marked as cancelled.")
         else:
@@ -182,7 +185,6 @@ def _auto_save_session(
     ai_code_steps: list[dict] = []
     ai_images: list[str] = []
     ai_content = ""
-    plan_part: dict | None = None
 
     for ev in events:
         t = ev.get("type")
@@ -205,17 +207,6 @@ def _auto_save_session(
         elif t == "output":
             if ai_code_steps:
                 ai_code_steps[-1]["output"] = c
-        elif t == "plan":
-            plan_part = {"type": "plan", "content": c}
-        elif t == "task_start":
-            ai_parts.append({
-                "type": "task_start",
-                "content": c,
-                "index": ev.get("index"),
-                "total": ev.get("total"),
-            })
-        elif t == "agent_label":
-            ai_parts.append({"type": "agent_label", "content": c})
         elif t == "clarification":
             # Support both the new Intent Agent shape (questions: [...]) and
             # the legacy single-question shape (question + options) so that
@@ -232,13 +223,6 @@ def _auto_save_session(
             if ev.get("reasoning"):
                 clar_part["reasoning"] = ev.get("reasoning")
             ai_parts.append(clar_part)
-        elif t == "critic":
-            ai_parts.append({
-                "type": "critic",
-                "judgment": ev.get("judgment", "ok"),
-                "feedback": ev.get("feedback", ""),
-                "additional_tasks": ev.get("additional_tasks", []),
-            })
         elif t == "file_export_done":
             ai_parts.append({
                 "type": "file_export",
@@ -248,9 +232,6 @@ def _auto_save_session(
                 "error": ev.get("error"),
             })
 
-
-    if plan_part:
-        ai_parts.insert(0, plan_part)
 
     messages.append({
         "role": "assistant",
@@ -270,3 +251,48 @@ def _auto_save_session(
         )
     except Exception as exc:
         logger.warning("Auto-save session %s failed: %s", session_id, exc)
+
+
+def _record_job_token_usage(
+    user_id: str,
+    job_id: str,
+    project_id: str,
+    question: str,
+    history: list,
+    events: list,
+) -> None:
+    """Calculate and persist token usage for the completed analysis job."""
+    try:
+        from backend.core.database import SessionLocal, UserTokenUsageRow
+        from backend.core.config import MODEL_CHAT
+
+        prompt_text = question + " " + " ".join(
+            [h[1] for h in (history or []) if isinstance(h, (list, tuple)) and len(h) > 1 and isinstance(h[1], str)]
+        )
+        output_text = " ".join(
+            [ev.get("content", "") for ev in events if isinstance(ev.get("content"), str)]
+        )
+
+        prompt_tokens = max(1, len(prompt_text) // 4)
+        completion_tokens = max(1, len(output_text) // 4)
+        total_tokens = prompt_tokens + completion_tokens
+
+        db = SessionLocal()
+        try:
+            row = UserTokenUsageRow(
+                user_id=user_id,
+                job_id=job_id,
+                project_id=project_id,
+                model_name=MODEL_CHAT or "chat-model",
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+            )
+            db.add(row)
+            db.commit()
+            logger.info("📊 Recorded token usage for user %s: %d tokens (prompt=%d, completion=%d)", user_id, total_tokens, prompt_tokens, completion_tokens)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.debug("Failed to record token usage: %s", exc)
+

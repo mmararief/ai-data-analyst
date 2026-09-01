@@ -52,7 +52,7 @@ function formatStepLabel(step) {
   if (tool === 'read_data_tool') {
     const match = code.match(/read_data_tool\(['"]([^'"]+)['"]/);
     const fname = match ? match[1] : (step.filename || 'dataset')
-    return `Read ${fname}`
+    return `Membaca ${fname}`
   }
   if (tool === 'download_dataset_tool') {
     const matchFname = code.match(/filename=['"]([^'"]+)['"]/);
@@ -61,23 +61,32 @@ function formatStepLabel(step) {
     const url = matchUrl && matchUrl[1] ? matchUrl[1] : '';
     return fname ? `Download ${fname}` : (url ? `Download dari internet` : 'Download dataset');
   }
+  if (tool === 'file_export_tool') {
+    return 'Mengekspor Berkas Hasil'
+  }
   if (tool === 'bash_tool') {
     if (code.includes('head')) {
-      return 'Execute Terminal | Preview CSV file structure'
+      return 'Terminal | Pratinjau Struktur CSV'
     }
     if (code.includes('todo') || code.includes('TODO')) {
-      return 'Write Todo'
+      return 'Menulis Rencana Tugas'
     }
     const cleanCmd = code.replace(/^\$\s*/, '').trim()
-    return `Execute Terminal | ${cleanCmd.slice(0, 30)}`
+    return `Terminal | ${cleanCmd.slice(0, 30)}`
   }
   if (tool === 'render_chart_tool') {
-    return 'Membuat Chart'
+    return 'Membuat Chart Visualisasi'
   }
   if (tool === 'data_profile_tool') {
     return 'Profiling Dataset'
   }
-  return 'Execute Python code'
+  if (code.includes('DataFrame') || code.includes('pd.read_') || code.includes('data =') || code.includes('df[')) {
+    return 'Eksekusi Kode Python | Memproses Data'
+  }
+  if (code.includes('plt.') || code.includes('sns.') || code.includes('fig')) {
+    return 'Eksekusi Kode Python | Render Visualisasi'
+  }
+  return 'Eksekusi Kode Python'
 }
 
 function getStepIcon(step, label) {
